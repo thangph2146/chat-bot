@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trợ lý AI - Đại học Ngân hàng TP.HCM</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="icon" href="https://tuyensinh.hub.edu.vn/wp-content/uploads/2022/06/cropped-favicon-32x32.png" sizes="32x32">
+    <!-- Script và tích hợp TW Config -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            50: '#fcebe9',
+                            100: '#f9d7d3',
+                            200: '#f3afa7',
+                            300: '#ed877b',
+                            400: '#e75f4f',
+                            500: '#e13723',
+                            600: '#b42c1c',
+                            700: '#872115',
+                            800: '#59160e',
+                            900: '#2c0b07',
+                        },
+                        secondary: {
+                            50: '#f8fafc',
+                            100: '#f1f5f9',
+                            200: '#e2e8f0',
+                            300: '#cbd5e1',
+                            400: '#94a3b8',
+                            500: '#64748b',
+                            600: '#475569',
+                            700: '#334155',
+                            800: '#1e293b',
+                            900: '#0f172a',
+                        },
+                        accent: {
+                            50: '#ebf6ff',
+                            100: '#d6edff',
+                            200: '#addbff',
+                            300: '#85c9ff',
+                            400: '#5cb7ff',
+                            500: '#3388ff',
+                            600: '#296cd9',
+                            700: '#1f51b3',
+                            800: '#15378c',
+                            900: '#0a1c66',
+                        },
+                        hub: {
+                            red: '#e13723',
+                            darkRed: '#b42c1c',
+                            gold: '#eaaa00',
+                            navy: '#0a1c66',
+                            gray: '#64748b',
+                            lightGray: '#e2e8f0',
+                            white: '#ffffff'
+                        }
+                    },
+                    boxShadow: {
+                        message: '0 4px 8px rgba(225, 55, 35, 0.1)',
+                        container: '0 6px 16px rgba(0, 0, 0, 0.12)',
+                        input: '0 -4px 12px rgba(0, 0, 0, 0.08)',
+                        hover: '0 8px 20px rgba(0, 0, 0, 0.15)',
+                        glow: '0 0 15px rgba(225, 55, 35, 0.4)',
+                        goldGlow: '0 0 15px rgba(234, 170, 0, 0.4)',
+                    },
+                    animation: {
+                        'fade-in': 'fadeIn 0.3s ease-in-out',
+                        'slide-up': 'slideUp 0.4s ease-out',
+                        'bounce': 'bounce 1.4s infinite ease-in-out both',
+                        'pulse': 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'float': 'float 3s ease-in-out infinite',
+                        'shimmer': 'shimmer 2s infinite',
+                    },
+                    keyframes: {
+                        fadeIn: {
+                            '0%': { opacity: '0', transform: 'translateY(10px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' },
+                        },
+                        slideUp: {
+                            '0%': { opacity: '0', transform: 'translateY(20px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' },
+                        },
+                        bounce: {
+                            '0%, 80%, 100%': { transform: 'scale(0)' },
+                            '40%': { transform: 'scale(1.0)' },
+                        },
+                        pulse: {
+                            '0%, 100%': { opacity: '1' },
+                            '50%': { opacity: '0.5' },
+                        },
+                        float: {
+                            '0%, 100%': { transform: 'translateY(0)' },
+                            '50%': { transform: 'translateY(-10px)' },
+                        },
+                        shimmer: {
+                            '0%': { backgroundPosition: '-1000px 0' },
+                            '100%': { backgroundPosition: '1000px 0' },
+                        },
+                    },
+                }
+            }
+        }
+    </script>
+</head>
+<body class="font-sans min-h-screen flex items-center justify-center">
+    <div class="container mx-auto p-4 md:p-6 max-w-6xl flex flex-col h-screen md:h-[90vh]">
+        <!-- Header -->
+        <div class="flex flex-col md:flex-row justify-between items-center mb-6 p-4 bg-white rounded-2xl shadow-container border-t-4 border-primary-600 animate-fade-in">
+            <div class="flex items-center mb-4 md:mb-0">
+                <img src="logo/logo.png" alt="Logo HUB" class="h-12 mr-4 transition-transform duration-300 hover:scale-105">
+                <h1 class="text-2xl md:text-3xl lg:text-4xl font-bold text-primary-600">Trợ lý AI Đại học Ngân hàng</h1>
+            </div>
+            <div class="flex gap-3">
+                <button id="clearHistoryButton" class="p-2 md:p-3 bg-secondary-200 text-secondary-700 rounded-lg hover:bg-secondary-300 hover:shadow-hover transition-all duration-300 text-sm font-medium flex items-center relative overflow-hidden transform hover:scale-105">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                    <span>Xóa toàn bộ</span>
+                </button>
+                <button id="newChatButton" class="p-2 md:p-3 bg-primary-600 text-white rounded-lg hover:shadow-glow hover:-translate-y-0.5 transition-all duration-300 text-sm font-medium flex items-center relative overflow-hidden transform hover:scale-105 animate-pulse">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                    </svg>
+                    <span>Chat mới</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="flex flex-col md:flex-row gap-4 md:gap-6 flex-grow animate-fade-in">
+            <!-- History Sidebar -->
+            <div class="w-full md:w-1/3 bg-white rounded-2xl shadow-container p-4 md:p-6 overflow-y-auto border border-primary-100 md:h-full" id="chatHistorySidebar">
+                <div class="flex justify-between items-center mb-4 border-b border-primary-100 pb-3">
+                    <h2 class="text-xl font-bold text-primary-600 flex items-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                        </svg>
+                        Lịch sử hội thoại
+                    </h2>
+                    <button id="newChatButtonSidebar" class="p-1.5 bg-primary-600 text-white rounded-lg hover:shadow-glow transition-all duration-300 text-sm font-medium flex items-center relative overflow-hidden transform hover:scale-110">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                        </svg>
+                    </button>
+                </div>
+                <div id="historySessions" class="flex flex-col gap-3"></div>
+            </div>
+
+            <!-- Chat Area -->
+            <div class="w-full md:w-2/3 flex flex-col gap-4">
+                <div class="flex flex-col overflow-y-auto p-4 bg-white rounded-2xl shadow-container border border-primary-100 flex-grow scrollbar-thin scrollbar-thumb-primary-600 scrollbar-track-secondary-200" id="chatContainer">
+                    <!-- Welcome Message -->
+                    <div class="flex flex-col items-center justify-center h-full text-center p-6 animate-fade-in" id="welcomeMessage">
+                        <div class="inline-flex p-3 rounded-full bg-primary-100 mb-4 animate-float">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                            </svg>
+                        </div>
+                        <h2 class="text-2xl font-bold text-primary-600 mb-3 animate-fade-in">Chào mừng đến với Trợ lý AI</h2>
+                        <p class="text-secondary-600 max-w-md mb-6 animate-fade-in">Trợ lý thông minh của Đại học Ngân hàng TP.HCM luôn sẵn sàng hỗ trợ bạn mọi lúc mọi nơi.</p>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 w-full max-w-md animate-fade-in">
+                            <button class="bg-primary-50 hover:bg-primary-100 text-primary-800 p-3 rounded-lg text-left border border-primary-200 transition-all transform hover:scale-105 hover:shadow-md">
+                                <span class="font-medium">Thông tin tuyển sinh</span>
+                            </button>
+                            <button class="bg-primary-50 hover:bg-primary-100 text-primary-800 p-3 rounded-lg text-left border border-primary-200 transition-all transform hover:scale-105 hover:shadow-md">
+                                <span class="font-medium">Học phí & học bổng</span>
+                            </button>
+                            <button class="bg-primary-50 hover:bg-primary-100 text-primary-800 p-3 rounded-lg text-left border border-primary-200 transition-all transform hover:scale-105 hover:shadow-md">
+                                <span class="font-medium">Lịch học & lịch thi</span>
+                            </button>
+                            <button class="bg-primary-50 hover:bg-primary-100 text-primary-800 p-3 rounded-lg text-left border border-primary-200 transition-all transform hover:scale-105 hover:shadow-md">
+                                <span class="font-medium">Các ngành đào tạo</span>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Chat Messages -->
+                    <div id="chatMessages" class="flex flex-col gap-4 hidden"></div>
+                    
+                    <!-- Typing Indicator -->
+                    <div id="typingIndicator" class="flex items-start p-3 hidden">
+                        <div class="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center mr-3 flex-shrink-0">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                            </svg>
+                        </div>
+                        <div class="bg-primary-50 rounded-xl p-3 max-w-xs flex items-center shadow-sm">
+                            <div class="flex space-x-2">
+                                <div class="w-2 h-2 rounded-full bg-primary-600 animate-bounce" style="animation-delay: -0.32s;"></div>
+                                <div class="w-2 h-2 rounded-full bg-primary-600 animate-bounce" style="animation-delay: -0.16s;"></div>
+                                <div class="w-2 h-2 rounded-full bg-primary-600 animate-bounce"></div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Loading Indicator -->
+                    <div id="loadingIndicator" class="flex justify-center items-center p-5 hidden">
+                        <div class="flex space-x-2">
+                            <div class="w-2.5 h-2.5 rounded-full bg-primary-600 animate-bounce" style="animation-delay: -0.32s;"></div>
+                            <div class="w-2.5 h-2.5 rounded-full bg-primary-600 animate-bounce" style="animation-delay: -0.16s;"></div>
+                            <div class="w-2.5 h-2.5 rounded-full bg-primary-600 animate-bounce"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- File Preview Area -->
+                <div id="filePreviewContainer" class="mt-1 flex flex-wrap gap-3 px-3"></div>
+                
+                <!-- Input Area -->
+                <div class="flex items-center gap-2 md:gap-4 bg-white rounded-2xl p-3 md:p-4 shadow-input border border-primary-100 animate-slide-up">
+                    <input type="text" id="messageInput" class="flex-grow p-2 md:p-3 border border-secondary-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-transparent shadow-sm transition-all duration-300" placeholder="Nhập tin nhắn của bạn tại đây...">
+                    
+                    <label for="fileInput" class="cursor-pointer p-2 md:p-3 bg-secondary-200 text-secondary-700 rounded-lg hover:bg-secondary-300 transition-all duration-300 flex items-center justify-center relative group transform hover:scale-105">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 md:h-6 md:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                        </svg>
+                        <span class="invisible opacity-0 absolute bottom-[-30px] left-1/2 transform -translate-x-1/2 bg-secondary-800 text-white px-2 py-1 rounded text-xs whitespace-nowrap transition-opacity group-hover:visible group-hover:opacity-90 z-10">Đính kèm tệp</span>
+                        <input type="file" id="fileInput" class="hidden" accept="image/*, .pdf, .doc, .docx" multiple>
+                    </label>
+                    
+                    <button id="recordButton" class="p-2 md:p-3 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-all duration-300 flex items-center justify-center relative overflow-hidden group transform hover:scale-105">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 md:h-6 md:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                        </svg>
+                        <span class="invisible opacity-0 absolute bottom-[-30px] left-1/2 transform -translate-x-1/2 bg-secondary-800 text-white px-2 py-1 rounded text-xs whitespace-nowrap transition-opacity group-hover:visible group-hover:opacity-90 z-10">Ghi âm giọng nói</span>
+                    </button>
+                    
+                    <button id="sendButton" class="p-2 md:p-3 bg-primary-600 text-white rounded-lg hover:shadow-glow hover:bg-primary-700 transition-all duration-300 flex items-center justify-center relative overflow-hidden group transform hover:scale-105 animate-pulse">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 md:h-6 md:w-6" viewBox="0 0 20 20" fill="currentColor">
+                            <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
+                        </svg>
+                        <span class="invisible opacity-0 absolute bottom-[-30px] left-1/2 transform -translate-x-1/2 bg-secondary-800 text-white px-2 py-1 rounded text-xs whitespace-nowrap transition-opacity group-hover:visible group-hover:opacity-90 z-10">Gửi tin nhắn</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Footer -->
+        <div class="mt-4 text-center text-xs text-secondary-500 animate-fade-in">
+            &copy; 2023 Đại học Ngân hàng TP.HCM | Trợ lý AI được phát triển bởi <a href="https://hub.edu.vn" class="text-primary-600 hover:underline">Hub.edu.vn</a>
+        </div>
+    </div>
+
+    <!-- Hiệu ứng ripple cho nút -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const rippleButtons = document.querySelectorAll('#clearHistoryButton, #newChatButton, #recordButton, #sendButton');
+            
+            rippleButtons.forEach(button => {
+                button.addEventListener('click', function(e) {
+                    const x = e.clientX - e.target.getBoundingClientRect().left;
+                    const y = e.clientY - e.target.getBoundingClientRect().top;
+                    
+                    const ripple = document.createElement('span');
+                    ripple.classList.add('absolute', 'rounded-full', 'bg-white', 'bg-opacity-40', 'transform', 'scale-0', 'animate-[ripple_0.6s_linear]');
+                    ripple.style.left = `${x}px`;
+                    ripple.style.top = `${y}px`;
+                    
+                    this.appendChild(ripple);
+                    
+                    setTimeout(() => {
+                        ripple.remove();
+                    }, 600);
+                });
+            });
+
+            // Thêm các câu hỏi gợi ý
+            const suggestionButtons = document.querySelectorAll('#chatContainer button');
+            suggestionButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    const messageInput = document.getElementById('messageInput');
+                    messageInput.value = this.querySelector('span').textContent;
+                    messageInput.focus();
+                    // Thêm hiệu ứng khi nhấn vào gợi ý
+                    this.classList.add('bg-primary-200', 'scale-95');
+                    setTimeout(() => {
+                        this.classList.remove('bg-primary-200', 'scale-95');
+                    }, 200);
+                });
+            });
+
+            // Khai báo biến messageInput một lần ở phạm vi toàn cục
+            const messageInput = document.getElementById('messageInput');
+            
+            // Thêm hiệu ứng gõ phím cho input
+            messageInput.addEventListener('input', function() {
+                this.classList.add('border-primary-400');
+                setTimeout(() => {
+                    this.classList.remove('border-primary-400');
+                }, 300);
+            });
+
+            // Hàm hiển thị tin nhắn dạng bong bóng chat
+            function addMessageToChat(message, isUserMessage) {
+                const chatMessages = document.getElementById('chatMessages');
+                const welcomeMessage = document.getElementById('welcomeMessage');
+                
+                // Ẩn thông điệp chào mừng khi có tin nhắn đầu tiên
+                if (welcomeMessage && !welcomeMessage.classList.contains('hidden')) {
+                    welcomeMessage.classList.add('hidden');
+                }
+                
+                // Hiển thị khu vực tin nhắn
+                chatMessages.classList.remove('hidden');
+                
+                // Tạo phần tử tin nhắn
+                const messageElement = document.createElement('div');
+                
+                if (isUserMessage) {
+                    // Tin nhắn người dùng - bên phải
+                    messageElement.className = 'flex flex-col items-end space-y-1 animate-fade-in';
+                    
+                    // Thời gian
+                    const timeDiv = document.createElement('div');
+                    timeDiv.className = 'text-xs text-secondary-500 mr-2';
+                    timeDiv.textContent = '11:10';
+                    messageElement.appendChild(timeDiv);
+
+                    // Nội dung tin nhắn
+                    const messageDiv = document.createElement('div');
+                    messageDiv.className = 'bg-primary-600 text-white px-4 py-2 rounded-t-2xl rounded-bl-2xl max-w-[85%] shadow-sm';
+                    messageDiv.textContent = message;
+                    messageElement.appendChild(messageDiv);
+                } else {
+                    // Tin nhắn bot - bên trái
+                    messageElement.className = 'flex flex-col space-y-1 animate-fade-in';
+                    
+                    // Thời gian
+                    const timeDiv = document.createElement('div');
+                    timeDiv.className = 'text-xs text-secondary-500 ml-2';
+                    timeDiv.textContent = '11:10';
+                    messageElement.appendChild(timeDiv);
+
+                    // Nội dung tin nhắn với avatar
+                    const messageRow = document.createElement('div');
+                    messageRow.className = 'flex items-start';
+                    
+                    const messageContent = document.createElement('div');
+                    messageContent.className = 'bg-secondary-100 text-secondary-800 px-4 py-2 rounded-t-2xl rounded-br-2xl max-w-[85%] shadow-sm';
+                    messageContent.textContent = message;
+                    
+                    messageRow.appendChild(messageContent);
+                    messageElement.appendChild(messageRow);
+                }
+                
+                chatMessages.appendChild(messageElement);
+                
+                // Cuộn xuống tin nhắn mới nhất
+                setTimeout(() => {
+                    const chatContainer = document.getElementById('chatContainer');
+                    chatContainer.scrollTop = chatContainer.scrollHeight;
+                }, 100);
+            }
+
+            // Hàm hiển thị hiệu ứng đang trả lời
+            function showTypingIndicator() {
+                const typingIndicator = document.getElementById('typingIndicator');
+                typingIndicator.classList.remove('hidden');
+                
+                // Cuộn xuống dưới cùng
+                const chatContainer = document.getElementById('chatContainer');
+                setTimeout(() => {
+                    chatContainer.scrollTop = chatContainer.scrollHeight;
+                }, 100);
+            }
+
+            // Hàm ẩn hiệu ứng đang trả lời
+            function hideTypingIndicator() {
+                const typingIndicator = document.getElementById('typingIndicator');
+                typingIndicator.classList.add('hidden');
+            }
+
+            // Sự kiện gửi tin nhắn để thử nghiệm giao diện (sẽ được thay thế bởi API thực tế)
+            const sendButton = document.getElementById('sendButton');
+            
+            sendButton.addEventListener('click', () => {
+                const messageText = messageInput.value.trim();
+                if (messageText) {
+                    // Thêm tin nhắn của người dùng
+                    addMessageToChat(messageText, true);
+                    messageInput.value = '';
+                    
+                    // Hiển thị hiệu ứng đang trả lời sau một khoảng trễ nhỏ
+                    setTimeout(() => {
+                        showTypingIndicator();
+                        
+                        // Mô phỏng phản hồi từ chatbot sau một khoảng thời gian
+                        setTimeout(() => {
+                            hideTypingIndicator();
+                            addMessageToChat('Xin chào! Tôi là Trợ lý AI của Đại học Ngân hàng TP.HCM. Tôi có thể giúp bạn trả lời các câu hỏi về tuyển sinh, chương trình đào tạo, học phí, và các thông tin khác về trường. Bạn cần hỗ trợ gì?', false);
+                        }, 2000);
+                    }, 500);
+                }
+            });
+
+            messageInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    sendButton.click();
+                }
+            });
+        });
+    </script>
+
+    <!-- Tích hợp API chatbot từ trolyai.hub.edu.vn -->
+    <script>
+        window.difyChatbotConfig = {
+            token: 'YLBbdRrlvFRDPkYV',
+            baseUrl: 'http://trolyai.hub.edu.vn'
+        };
+    </script>
+    <script src="http://trolyai.hub.edu.vn/embed.min.js" id="YLBbdRrlvFRDPkYV" defer></script>
+    <style>
+        /* Tùy chỉnh thanh cuộn */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+            border-radius: 10px;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: #b42c1c;
+            border-radius: 10px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: #872115;
+        }
+        
+        /* Hiệu ứng ripple */
+        @keyframes ripple {
+            to {
+                transform: scale(2.5);
+                opacity: 0;
+            }
+        }
+        
+        /* Hiệu ứng fade-out cho thông báo */
+        .fade-out {
+            animation: fadeOut 0.3s forwards;
+        }
+        
+        @keyframes fadeOut {
+            from { opacity: 1; }
+            to { opacity: 0; }
+        }
+        
+        /* Style cho bubble chat */
+        #chatMessages > div {
+            transition: all 0.3s ease;
+            transform-origin: bottom;
+        }
+        
+        #chatMessages > div:hover {
+            transform: translateY(-2px);
+        }
+        
+        /* Style cho tin nhắn của bot */
+        #chatMessages > div:not(.items-end) > div:last-child > div {
+            position: relative;
+        }
+        
+        #chatMessages > div:not(.items-end) > div:last-child > div::before {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: -8px;
+            width: 16px;
+            height: 16px;
+            background: #f1f5f9;
+            border-radius: 0 0 16px 0;
+            clip-path: polygon(0 0, 100% 100%, 100% 0);
+        }
+        
+        /* Style cho tin nhắn của người dùng */
+        #chatMessages > div.items-end > div:last-child {
+            position: relative;
+        }
+        
+        #chatMessages > div.items-end > div:last-child::before {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            right: -8px;
+            width: 16px;
+            height: 16px;
+            background: #b42c1c;
+            border-radius: 0 0 0 16px;
+            clip-path: polygon(0 100%, 0 0, 100% 0);
+        }
+        
+        /* Hiệu ứng loading cho typing indicator */
+        #typingIndicator .animate-bounce {
+            animation: bounce 1.4s infinite ease-in-out both;
+        }
+        
+        /* Hiệu ứng cho tin nhắn mới */
+        @keyframes popIn {
+            0% { transform: scale(0.8); opacity: 0; }
+            70% { transform: scale(1.05); }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        
+        .animate-pop-in {
+            animation: popIn 0.3s forwards;
+        }
+        
+        /* Style cho khu vực nhắn tin */
+        #messageInput:focus {
+            box-shadow: 0 0 0 2px rgba(180, 44, 28, 0.2);
+        }
+        
+        /* Style cho nút gửi tin nhắn */
+        #sendButton:hover svg {
+            transform: translateX(2px);
+            transition: transform 0.2s ease;
+        }
+        
+        /* Style cho bubble khi hover */
+        #chatMessages > div > div:last-child:hover {
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+    </style>
+    <script src="script.js"></script>
+</body>
+</html> 
