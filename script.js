@@ -29,6 +29,17 @@ function generateId() {
     return Date.now().toString(36) + Math.random().toString(36).substr(2);
 }
 
+/**
+ * Tạo ID duy nhất phức tạp hơn cho việc khôi phục phiên
+ * @returns {string} ID duy nhất
+ */
+function generateUniqueId() {
+    const timestamp = Date.now().toString(36);
+    const randomStr = Math.random().toString(36).substring(2, 10);
+    const uuid = crypto && crypto.randomUUID ? crypto.randomUUID().replace(/-/g, '').substring(0, 8) : '';
+    return `${timestamp}-${randomStr}-${uuid || Math.random().toString(36).substring(2, 6)}`;
+}
+
 // Khởi tạo Web Speech API để thu âm giọng nói
 function initSpeechRecognition() {
     if ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window) {
@@ -376,6 +387,7 @@ function updateHistorySidebar() {
     
     sortedSessions.forEach(session => {
         const sessionItem = document.createElement('div');
+        sessionItem.id = `session-${session.id}`;
         sessionItem.className = `p-3 rounded-lg cursor-pointer text-sm truncate flex justify-between items-center mb-2 transition-all hover:shadow-hover ${
             session.id === currentSessionId 
                 ? 'bg-primary-100 text-primary-700 border-l-4 border-primary-500' 
@@ -527,7 +539,7 @@ function clearChatHistory() {
         const undoNotification = showNotificationWithAction(
             'Đã xóa toàn bộ lịch sử chat', 
             'Hoàn tác', 
-            recoverLastDeletedSessions
+            recoverLastDeletedSession
         );
         
         // Đóng dialog
@@ -548,87 +560,145 @@ function clearChatHistory() {
     document.body.appendChild(confirmDialog);
 }
 
-// Khôi phục phiên chat vừa xóa
-function recoverLastDeletedSessions() {
+/**
+ * Khôi phục phiên chat đã xóa gần nhất
+ * @returns {boolean} Trả về true nếu khôi phục thành công, false nếu không có phiên nào để khôi phục
+ */
+function recoverLastDeletedSession() {
+    const lastDeletedSessionJSON = sessionStorage.getItem('lastDeletedSession');
+    if (!lastDeletedSessionJSON) {
+        showNotification('Không có phiên chat nào để khôi phục', 'warning');
+        return false;
+    }
+    
     try {
-        const lastDeleted = sessionStorage.getItem('lastDeletedSessions');
-        if (lastDeleted) {
-            const deletedSessions = JSON.parse(lastDeleted);
-            if (Array.isArray(deletedSessions) && deletedSessions.length > 0) {
-                // Khôi phục dữ liệu
-                chatSessions = deletedSessions;
-                currentSessionId = deletedSessions[deletedSessions.length - 1].id;
-                
-                // Lưu lại vào localStorage
-                saveChatSessions();
-                
-                // Cập nhật giao diện
-                updateHistorySidebar();
-                
-                // Tải lại tin nhắn
-                chatContainer.innerHTML = '';
-                const currentSession = chatSessions.find(s => s.id === currentSessionId);
-                if (currentSession && Array.isArray(currentSession.messages)) {
-                    currentSession.messages.forEach(msg => {
-                        addMessageToChat(msg.message, msg.isUser, [], false);
-                    });
-                }
-                
-                // Hiển thị thông báo
-                showNotification('Đã khôi phục lịch sử chat', 'success');
-                return true;
-            }
+        // Lấy dữ liệu phiên chat đã xóa
+        const lastDeletedSession = JSON.parse(lastDeletedSessionJSON);
+        
+        // Kiểm tra xem ID đã tồn tại trong chatSessions chưa
+        if (chatSessions.some(s => s.id === lastDeletedSession.id)) {
+            // Nếu ID đã tồn tại, tạo ID mới cho phiên khôi phục
+            lastDeletedSession.id = generateUniqueId();
         }
         
-        showNotification('Không thể khôi phục lịch sử chat', 'error');
-        return false;
-    } catch (e) {
-        console.error('Lỗi khi khôi phục phiên chat đã xóa:', e);
-        showNotification('Không thể khôi phục lịch sử chat', 'error');
+        // Thêm phiên đã xóa vào danh sách
+        chatSessions.push(lastDeletedSession);
+        
+        // Lưu lại vào localStorage
+        saveChatSessions();
+        
+        // Cập nhật giao diện
+        updateHistorySidebar();
+        
+        // Chọn phiên vừa khôi phục
+        loadSession(lastDeletedSession.id);
+        
+        // Xóa dữ liệu phiên đã khôi phục
+        sessionStorage.removeItem('lastDeletedSession');
+        
+        // Hiển thị thông báo thành công
+        showNotification('Đã khôi phục phiên chat thành công', 'success');
+        
+        return true;
+    } catch (error) {
+        console.error('Lỗi khi khôi phục phiên chat:', error);
+        showNotification('Không thể khôi phục phiên chat', 'error');
         return false;
     }
 }
 
-// Hiển thị thông báo với nút hành động
-function showNotificationWithAction(message, actionText, actionCallback, type = 'info') {
+/**
+ * Hiển thị thông báo với nút hành động
+ * @param {string} message - Nội dung thông báo
+ * @param {string} actionText - Văn bản nút hành động
+ * @param {Function} actionCallback - Hàm callback khi nhấn nút
+ * @param {number} [duration=5000] - Thời gian hiển thị (ms)
+ * @returns {HTMLElement} Phần tử thông báo
+ */
+function showNotificationWithAction(message, actionText, actionCallback, duration = 5000) {
     // Tạo phần tử thông báo
     const notification = document.createElement('div');
-    notification.className = `fixed bottom-4 right-4 px-4 py-3 rounded-lg text-white text-sm font-medium animate-slide-up z-50 flex items-center justify-between gap-4 ${
-        type === 'error' ? 'bg-red-500' : 
-        type === 'success' ? 'bg-green-500' : 
-        type === 'warning' ? 'bg-yellow-500' : 'bg-blue-500'
-    }`;
+    notification.className = 'fixed bottom-4 right-4 bg-secondary-800 text-white px-6 py-4 rounded-lg shadow-lg z-50 flex items-center min-w-[300px] max-w-md';
+    notification.style.transform = 'translateY(20px)';
+    notification.style.opacity = '0';
+    notification.style.transition = 'transform 0.3s ease, opacity 0.3s ease';
     
-    const messageSpan = document.createElement('span');
-    messageSpan.textContent = message;
-    notification.appendChild(messageSpan);
+    // Tạo phần nội dung thông báo
+    const messageElement = document.createElement('div');
+    messageElement.className = 'flex-1 mr-4';
+    messageElement.textContent = message;
     
+    // Tạo nút hành động
     const actionButton = document.createElement('button');
+    actionButton.className = 'bg-primary-600 hover:bg-primary-500 text-white px-3 py-1 rounded-md transition-colors text-sm font-medium';
     actionButton.textContent = actionText;
-    actionButton.className = 'bg-white bg-opacity-20 px-2 py-1 rounded hover:bg-opacity-30 transition-colors';
     actionButton.onclick = () => {
-        if (typeof actionCallback === 'function') {
+        if (actionCallback && typeof actionCallback === 'function') {
             actionCallback();
         }
-        
-        if (notification.parentNode) {
-            notification.parentNode.removeChild(notification);
-        }
+        // Xóa thông báo sau khi nhấn nút
+        removeNotification();
     };
-    notification.appendChild(actionButton);
     
     // Thêm vào DOM
+    notification.appendChild(messageElement);
+    notification.appendChild(actionButton);
     document.body.appendChild(notification);
     
-    // Xóa sau 8 giây
-    const timer = setTimeout(() => {
-        notification.classList.add('fade-out');
+    // Hiệu ứng hiển thị
+    setTimeout(() => {
+        notification.style.transform = 'translateY(0)';
+        notification.style.opacity = '1';
+    }, 10);
+    
+    // Biến để theo dõi thời gian còn lại
+    let remainingTime = duration;
+    let timeoutId = null;
+    let startTime = Date.now();
+    let isPaused = false;
+    
+    // Xử lý sự kiện hover để tạm dừng thời gian tự động đóng
+    notification.addEventListener('mouseenter', () => {
+        if (timeoutId) {
+            clearTimeout(timeoutId);
+            timeoutId = null;
+            // Lưu thời gian còn lại khi hover
+            remainingTime -= (Date.now() - startTime);
+            isPaused = true;
+        }
+    });
+    
+    notification.addEventListener('mouseleave', () => {
+        if (isPaused) {
+            // Tiếp tục đếm thời gian khi không hover
+            startTime = Date.now();
+            timeoutId = setTimeout(removeNotification, remainingTime);
+            isPaused = false;
+        }
+    });
+    
+    // Hàm để xóa thông báo
+    function removeNotification() {
+        if (timeoutId) {
+            clearTimeout(timeoutId);
+        }
+        
+        notification.style.transform = 'translateY(20px)';
+        notification.style.opacity = '0';
+        
+        // Xóa phần tử sau khi hiệu ứng hoàn tất
         setTimeout(() => {
-            if (notification.parentNode) {
-                notification.parentNode.removeChild(notification);
+            if (document.body.contains(notification)) {
+                document.body.removeChild(notification);
             }
         }, 300);
-    }, 8000);
+    }
+    
+    // Thiết lập thời gian tự động đóng
+    if (duration > 0) {
+        startTime = Date.now();
+        timeoutId = setTimeout(removeNotification, duration);
+    }
     
     return notification;
 }
@@ -865,7 +935,7 @@ async function callChatbotAPI(message, conversationId = '') {
     try {
         // Tạo message placeholder để hiển thị streaming response
         const placeholderId = `msg-${Date.now()}`;
-        addMessageToChat('', false, [], true, placeholderId);
+        const messageElement = addMessageToChat('', false, [], true, placeholderId);
         
         // Streaming mode - fetch với stream true
         const response = await fetch('http://trolyai.hub.edu.vn/v1/chat-messages', {
@@ -877,7 +947,7 @@ async function callChatbotAPI(message, conversationId = '') {
             body: JSON.stringify({
                 inputs: {},
                 query: message,
-                response_mode: 'streaming', // Chuyển sang chế độ streaming
+                response_mode: 'streaming', // Chế độ streaming
                 conversation_id: conversationId,
                 user: 'user'
             })
@@ -896,21 +966,46 @@ async function callChatbotAPI(message, conversationId = '') {
         let conversationIdFromStream = '';
         
         // Tìm message element để cập nhật nội dung
-        const messageElement = document.getElementById(placeholderId);
         if (!messageElement) {
             throw new Error('Không tìm thấy phần tử tin nhắn để cập nhật');
         }
         
-        const textElement = messageElement.querySelector('.message-content');
+        // Tìm hoặc tạo phần tử content
+        let textElement = messageElement.querySelector('.message-content');
         if (!textElement) {
-            const newTextElement = document.createElement('div');
-            newTextElement.className = 'message-content';
-            messageElement.prepend(newTextElement);
-            textElement = newTextElement;
+            const messageRow = messageElement.querySelector('div[class^="flex items-start"]');
+            if (!messageRow) {
+                throw new Error('Không tìm thấy message row để thêm nội dung');
+            }
+            
+            // Tạo content container nếu không tồn tại
+            const contentDiv = messageRow.querySelector('div[class^="bg-secondary-100"]');
+            if (contentDiv) {
+                // Đảm bảo có class message-content
+                contentDiv.classList.add('message-content');
+                textElement = contentDiv;
+            } else {
+                const newContentDiv = document.createElement('div');
+                newContentDiv.className = 'bg-secondary-100 text-secondary-800 px-4 py-2 rounded-t-2xl rounded-br-2xl max-w-[85%] shadow-sm message-content';
+                messageRow.appendChild(newContentDiv);
+                textElement = newContentDiv;
+            }
         }
         
         // Thêm hiệu ứng typing
         messageElement.classList.add('typing');
+        
+        // Tạo container cho nội dung markdown
+        if (!textElement.querySelector('.markdown-content')) {
+            const markdownContainer = document.createElement('div');
+            markdownContainer.className = 'markdown-content';
+            textElement.appendChild(markdownContainer);
+        }
+        
+        const markdownContainer = textElement.querySelector('.markdown-content');
+        if (!markdownContainer) {
+            throw new Error('Không thể tạo container cho nội dung markdown');
+        }
         
         while (true) {
             const { done, value } = await reader.read();
@@ -927,7 +1022,14 @@ async function callChatbotAPI(message, conversationId = '') {
                         if (data.event === 'message') {
                             // Cập nhật tin nhắn streaming
                             accumulatedResponse += data.answer || '';
-                            textElement.textContent = accumulatedResponse;
+                            
+                            // Render nội dung markdown
+                            markdownContainer.innerHTML = renderMarkdown(accumulatedResponse);
+                            
+                            // Áp dụng highlight cho code blocks sau khi thêm nội dung markdown
+                            setTimeout(() => {
+                                highlightCodeBlocks(markdownContainer);
+                            }, 10);
                             
                             // Cuộn xuống khi có nội dung mới
                             chatContainer.scrollTop = chatContainer.scrollHeight;
@@ -936,9 +1038,14 @@ async function callChatbotAPI(message, conversationId = '') {
                             if (data.conversation_id && !conversationIdFromStream) {
                                 conversationIdFromStream = data.conversation_id;
                             }
-                        } else if (data.event === 'done') {
+                        } else if (data.event === 'message_end' || data.event === 'done') {
                             // Stream đã hoàn tất
                             messageElement.classList.remove('typing');
+                            
+                            // Lưu metadata nếu có
+                            if (data.metadata) {
+                                console.log('Metadata từ API:', data.metadata);
+                            }
                         }
                     } catch (e) {
                         console.error('Lỗi khi parse JSON từ stream:', e);
@@ -981,6 +1088,154 @@ async function callChatbotAPI(message, conversationId = '') {
             answer: 'Xin lỗi, đã có lỗi xảy ra khi kết nối đến trợ lý. Vui lòng thử lại sau.',
             error: true
         };
+    }
+}
+
+/**
+ * Chuyển đổi văn bản markdown thành HTML
+ * @param {string} text - Văn bản markdown cần chuyển đổi
+ * @returns {string} HTML đã được render
+ */
+function renderMarkdown(text) {
+    if (!text) return '';
+    
+    // Xử lý code blocks trước tiên (để tránh xung đột với các regex khác)
+    let html = text.replace(/```([\w-]*)\n([\s\S]*?)\n```/g, function(match, language, code) {
+        language = language.trim();
+        // Thêm class ngôn ngữ nếu được chỉ định
+        const languageClass = language ? ` language-${language}` : '';
+        return `<pre><code class="hljs${languageClass}">${code.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</code></pre>`;
+    });
+    
+    // Xử lý đường dẫn
+    html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" class="text-primary-600 hover:underline">$1</a>');
+    
+    // Xử lý tiêu đề
+    html = html.replace(/^### (.*$)/gm, '<h3 class="text-lg font-bold my-2">$1</h3>');
+    html = html.replace(/^## (.*$)/gm, '<h2 class="text-xl font-bold my-3">$1</h2>');
+    html = html.replace(/^# (.*$)/gm, '<h1 class="text-2xl font-bold my-4">$1</h1>');
+    
+    // Xử lý đoạn văn mới
+    html = html.replace(/\n\n/g, '<br><br>');
+    
+    // Xử lý in đậm và in nghiêng
+    html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    html = html.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+    
+    // Xử lý danh sách không có thứ tự
+    html = html.replace(/^\* (.*$)/gm, '<li class="ml-4 list-disc">$1</li>');
+    html = html.replace(/^- (.*$)/gm, '<li class="ml-4 list-disc">$1</li>');
+    
+    // Xử lý danh sách có thứ tự
+    html = html.replace(/^\d+\. (.*$)/gm, '<li class="ml-4 list-decimal">$1</li>');
+    
+    // Nhóm các mục danh sách thành danh sách UL/OL
+    html = html.replace(/<li class="ml-4 list-disc">(.+?)<\/li>(?!\s*<li)/gs, '<ul class="my-2"><li class="ml-4 list-disc">$1</li></ul>');
+    html = html.replace(/<li class="ml-4 list-decimal">(.+?)<\/li>(?!\s*<li)/gs, '<ol class="my-2"><li class="ml-4 list-decimal">$1</li></ol>');
+    
+    // Tránh lặp ul/ol
+    html = html.replace(/<\/ul>\s*<ul class="my-2">/g, '');
+    html = html.replace(/<\/ol>\s*<ol class="my-2">/g, '');
+    
+    // Ghép nhiều li liên tiếp vào cùng một ul/ol
+    html = html.replace(/<\/li><\/ul>\s*<ul class="my-2"><li/g, '</li><li');
+    html = html.replace(/<\/li><\/ol>\s*<ol class="my-2"><li/g, '</li><li');
+    
+    // Xử lý inline code (sau khi xử lý code blocks)
+    html = html.replace(/`([^`]+)`/g, '<code class="inline-code bg-secondary-100 text-secondary-800 px-1 rounded font-mono">$1</code>');
+    
+    // Xử lý bảng (nếu có)
+    if (text.includes('|')) {
+        // Nhận dạng bảng markdown
+        const tableRegex = /\|(.+)\|\n\|(\s*[-:]+[-:|\s]*)\|\n((\|.+\|\n)+)/g;
+        html = html.replace(tableRegex, function(match, headerRow, separatorRow, bodyRows) {
+            // Xử lý hàng tiêu đề
+            const headers = headerRow.split('|').map(h => h.trim()).filter(h => h);
+            let tableHtml = '<div class="overflow-x-auto my-4"><table class="w-full border-collapse">\n<thead>\n<tr>';
+            
+            headers.forEach(header => {
+                tableHtml += `<th class="border border-secondary-300 bg-secondary-100 px-4 py-2 text-left">${header}</th>`;
+            });
+            
+            tableHtml += '</tr>\n</thead>\n<tbody>';
+            
+            // Xử lý phần thân bảng
+            const rows = bodyRows.trim().split('\n');
+            rows.forEach(row => {
+                const cells = row.split('|').map(c => c.trim()).filter(c => c);
+                if (cells.length) {
+                    tableHtml += '\n<tr>';
+                    cells.forEach(cell => {
+                        tableHtml += `<td class="border border-secondary-300 px-4 py-2">${cell}</td>`;
+                    });
+                    tableHtml += '</tr>';
+                }
+            });
+            
+            tableHtml += '\n</tbody>\n</table></div>';
+            return tableHtml;
+        });
+    }
+    
+    // Xử lý các thẻ đặc biệt
+    const blockquoteRegex = /^> (.*)$/gm;
+    html = html.replace(blockquoteRegex, '<blockquote class="pl-4 border-l-4 border-primary-500 italic my-4 text-secondary-600">$1</blockquote>');
+    
+    // Xử lý đường ngang
+    html = html.replace(/^\s*(-{3,}|={3,})\s*$/gm, '<hr class="my-4 border-t border-secondary-300">');
+    
+    return html;
+}
+
+/**
+ * Highlight code blocks trong container
+ * @param {HTMLElement} container - Container chứa code cần highlight
+ */
+function highlightCodeBlocks(container) {
+    if (!container || typeof hljs === 'undefined') return;
+    
+    try {
+        // Lấy tất cả các code blocks
+        const codeBlocks = container.querySelectorAll('pre code');
+        if (codeBlocks.length === 0) return;
+        
+        // Highlight từng block
+        codeBlocks.forEach(block => {
+            // Thêm padding cho block
+            const preTag = block.parentElement;
+            if (preTag) {
+                preTag.classList.add('rounded-lg', 'overflow-x-auto', 'my-4');
+            }
+            
+            // Highlight với hljs
+            hljs.highlightElement(block);
+            
+            // Thêm nút copy code nếu chưa có
+            if (!preTag.querySelector('.copy-code-button')) {
+                const copyButton = document.createElement('button');
+                copyButton.className = 'copy-code-button absolute top-2 right-2 bg-secondary-200 bg-opacity-80 hover:bg-secondary-300 text-secondary-800 rounded px-2 py-1 text-xs';
+                copyButton.textContent = 'Sao chép';
+                copyButton.onclick = function() {
+                    const code = block.textContent;
+                    navigator.clipboard.writeText(code).then(() => {
+                        copyButton.textContent = 'Đã sao chép!';
+                        setTimeout(() => {
+                            copyButton.textContent = 'Sao chép';
+                        }, 2000);
+                    }).catch(err => {
+                        console.error('Không thể sao chép code:', err);
+                    });
+                };
+                
+                // Thêm position relative cho pre tag để có thể định vị button
+                if (preTag) {
+                    preTag.style.position = 'relative';
+                    preTag.appendChild(copyButton);
+                }
+            }
+        });
+    } catch (error) {
+        console.error('Lỗi khi highlight code:', error);
     }
 }
 
@@ -1291,3 +1546,167 @@ document.addEventListener('DOMContentLoaded', () => {
         newChatButtonSidebar.addEventListener('click', startNewChat);
     }
 });
+
+/**
+ * Xóa một phiên chat
+ * @param {string} sessionId - ID của phiên chat cần xóa
+ */
+function deleteSession(sessionId) {
+    const sessionElement = document.getElementById(`session-${sessionId}`);
+    if (!sessionElement) return;
+    
+    // Hiển thị hộp thoại xác nhận
+    const confirmDialog = document.createElement('div');
+    confirmDialog.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+    confirmDialog.innerHTML = `
+        <div class="bg-[#343541] rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 class="text-xl font-semibold text-white mb-4">Xác nhận xóa</h3>
+            <p class="text-gray-300 mb-6">Bạn có chắc chắn muốn xóa phiên chat này không?</p>
+            <div class="flex justify-end gap-3">
+                <button id="cancel-delete" class="px-4 py-2 rounded-md bg-gray-600 text-white hover:bg-gray-700 transition-colors">Hủy</button>
+                <button id="confirm-delete" class="px-4 py-2 rounded-md bg-red-600 text-white hover:bg-red-700 transition-colors">Xóa</button>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(confirmDialog);
+    
+    // Xử lý sự kiện nút
+    document.getElementById('cancel-delete').addEventListener('click', () => {
+        document.body.removeChild(confirmDialog);
+    });
+    
+    document.getElementById('confirm-delete').addEventListener('click', () => {
+        // Tìm và lưu phiên chat bị xóa vào sessionStorage để có thể khôi phục
+        const sessionIndex = chatSessions.findIndex(s => s.id === sessionId);
+        
+        if (sessionIndex !== -1) {
+            const deletedSession = chatSessions[sessionIndex];
+            sessionStorage.setItem('lastDeletedSession', JSON.stringify(deletedSession));
+            
+            // Xóa phiên khỏi danh sách
+            chatSessions.splice(sessionIndex, 1);
+            
+            // Lưu vào localStorage
+            saveChatSessions();
+            
+            // Chọn phiên chat mới nếu phiên bị xóa đang được chọn
+            if (currentSessionId === sessionId) {
+                if (chatSessions.length > 0) {
+                    loadSession(chatSessions[0].id);
+                } else {
+                    // Tạo phiên mới nếu không còn phiên nào
+                    startNewChat();
+                }
+            }
+            
+            // Cập nhật giao diện
+            updateHistorySidebar();
+            
+            // Hiển thị thông báo với nút khôi phục
+            showNotificationWithAction(
+                'Đã xóa phiên chat',
+                'Khôi phục',
+                () => recoverLastDeletedSession()
+            );
+        }
+        
+        // Đóng hộp thoại
+        document.body.removeChild(confirmDialog);
+    });
+}
+
+/**
+ * Hiển thị thông báo đơn giản
+ * @param {string} message - Nội dung thông báo
+ * @param {string} [type='info'] - Loại thông báo: 'info', 'success', 'warning', 'error'
+ * @param {number} [duration=3000] - Thời gian hiển thị thông báo (ms)
+ * @returns {HTMLElement} Phần tử thông báo
+ */
+function showNotification(message, type = 'info', duration = 3000) {
+    // Tạo phần tử thông báo
+    const notification = document.createElement('div');
+    
+    // Xác định màu sắc dựa vào loại thông báo
+    let bgColor, textColor, iconSvg;
+    
+    switch (type) {
+        case 'success':
+            bgColor = 'bg-green-500';
+            textColor = 'text-white';
+            iconSvg = `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+            </svg>`;
+            break;
+        case 'warning':
+            bgColor = 'bg-yellow-500';
+            textColor = 'text-white';
+            iconSvg = `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>`;
+            break;
+        case 'error':
+            bgColor = 'bg-red-500';
+            textColor = 'text-white';
+            iconSvg = `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>`;
+            break;
+        default: // info
+            bgColor = 'bg-blue-500';
+            textColor = 'text-white';
+            iconSvg = `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>`;
+    }
+    
+    // Thiết lập nội dung và kiểu dáng thông báo
+    notification.className = `fixed bottom-4 right-4 ${bgColor} ${textColor} px-4 py-3 rounded-lg shadow-lg z-50 flex items-center transform translate-y-20 opacity-0 transition-all duration-300`;
+    notification.innerHTML = `
+        ${iconSvg}
+        <span>${message}</span>
+    `;
+    
+    // Thêm vào DOM
+    document.body.appendChild(notification);
+    
+    // Hiệu ứng hiển thị
+    setTimeout(() => {
+        notification.style.transform = 'translateY(0)';
+        notification.style.opacity = '1';
+    }, 10);
+    
+    // Tự động đóng sau thời gian
+    const timeoutId = setTimeout(() => {
+        notification.style.transform = 'translateY(20px)';
+        notification.style.opacity = '0';
+        
+        // Xóa phần tử sau khi hiệu ứng hoàn tất
+        setTimeout(() => {
+            if (document.body.contains(notification)) {
+                document.body.removeChild(notification);
+            }
+        }, 300);
+    }, duration);
+    
+    // Dừng đếm ngược khi hover
+    notification.addEventListener('mouseenter', () => {
+        clearTimeout(timeoutId);
+    });
+    
+    // Tiếp tục đếm ngược khi không hover
+    notification.addEventListener('mouseleave', () => {
+        setTimeout(() => {
+            notification.style.transform = 'translateY(20px)';
+            notification.style.opacity = '0';
+            
+            setTimeout(() => {
+                if (document.body.contains(notification)) {
+                    document.body.removeChild(notification);
+                }
+            }, 300);
+        }, 1000); // Thêm 1 giây trước khi đóng sau khi di chuột ra
+    });
+    
+    return notification;
+}

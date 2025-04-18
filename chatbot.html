@@ -7,6 +7,69 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="icon" href="https://tuyensinh.hub.edu.vn/wp-content/uploads/2022/06/cropped-favicon-32x32.png" sizes="32x32">
+    <!-- Highlight.js để hiển thị code -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+    <!-- Các ngôn ngữ lập trình phổ biến -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/languages/javascript.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/languages/python.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/languages/java.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/languages/csharp.min.js"></script>
+    <!-- CSS cho markdown content -->
+    <style>
+        /* Kiểu cho nội dung markdown */
+        .markdown-content {
+            line-height: 1.6;
+        }
+        .markdown-content h1, .markdown-content h2, .markdown-content h3 {
+            margin-top: 1rem;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+        }
+        .markdown-content ul, .markdown-content ol {
+            margin-left: 1rem;
+            margin-bottom: 1rem;
+        }
+        .markdown-content a {
+            color: #b42c1c;
+            text-decoration: none;
+        }
+        .markdown-content a:hover {
+            text-decoration: underline;
+        }
+        .markdown-content code {
+            font-family: 'Courier New', monospace;
+            padding: 0.1rem 0.3rem;
+            border-radius: 0.2rem;
+            background-color: #f1f5f9;
+        }
+        .markdown-content pre {
+            margin: 1rem 0;
+            border-radius: 0.4rem;
+            overflow-x: auto;
+        }
+        .markdown-content pre code {
+            padding: 1rem;
+            border-radius: 0.3rem;
+            background-color: #1e293b;
+            color: #e2e8f0;
+            display: block;
+            white-space: pre;
+            -webkit-overflow-scrolling: touch;
+        }
+        /* Kiểu cho tin nhắn đang nhập */
+        .typing .markdown-content {
+            position: relative;
+        }
+        .typing .markdown-content::after {
+            content: '▌';
+            display: inline-block;
+            animation: blink 1s step-start infinite;
+        }
+        @keyframes blink {
+            50% { opacity: 0; }
+        }
+    </style>
     <!-- Script và tích hợp TW Config -->
     <script src="js/auth-config.js"></script>
     <script src="js/logout.js"></script>
