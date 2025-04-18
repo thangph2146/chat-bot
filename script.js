@@ -1151,8 +1151,128 @@ function formatFileSize(bytes) {
     return (bytes / 1048576).toFixed(1) + ' MB';
 }
 
+// Kiểm tra đăng nhập khi tải trang
+function checkAuthentication() {
+    // Kiểm tra xem đã đăng nhập chưa
+    if (!isUserLoggedIn()) {
+        // Nếu chưa đăng nhập, chuyển hướng về trang đăng nhập
+        window.location.href = 'login.html?message=' + encodeURIComponent('Vui lòng đăng nhập để tiếp tục') + '&type=warning';
+        return false;
+    }
+    return true;
+}
+
+/**
+ * Kiểm tra trạng thái đăng nhập
+ * @returns {boolean} Trạng thái đăng nhập
+ */
+function isUserLoggedIn() {
+    try {
+        const token = localStorage.getItem(AuthConfig.tokenStorage.tokenKey);
+        const userData = localStorage.getItem(AuthConfig.tokenStorage.userKey);
+        
+        if (!token || !userData) {
+            return false;
+        }
+        
+        // Kiểm tra thời gian hết hạn
+        const loginTime = parseInt(localStorage.getItem(AuthConfig.tokenStorage.timeKey) || '0');
+        const currentTime = Date.now();
+        
+        if (currentTime - loginTime > AuthConfig.tokenStorage.expireTime) {
+            // Token đã hết hạn, xóa dữ liệu đăng nhập
+            clearAuthData();
+            return false;
+        }
+        
+        return true;
+    } catch (error) {
+        console.error('Lỗi kiểm tra đăng nhập:', error);
+        return false;
+    }
+}
+
+/**
+ * Xử lý đăng xuất
+ */
+function handleUserLogout() {
+    if (confirm('Bạn có chắc chắn muốn đăng xuất?')) {
+        // Lưu tạm dữ liệu chat trước khi đăng xuất
+        saveChatSessions();
+        
+        // Xóa dữ liệu xác thực
+        clearAuthData();
+        
+        // Chuyển hướng về trang đăng nhập
+        window.location.href = 'login.html?message=' + encodeURIComponent('Đăng xuất thành công') + '&type=success';
+    }
+}
+
+/**
+ * Xóa dữ liệu xác thực
+ */
+function clearAuthData() {
+    localStorage.removeItem(AuthConfig.tokenStorage.tokenKey);
+    localStorage.removeItem(AuthConfig.tokenStorage.userKey);
+    localStorage.removeItem(AuthConfig.tokenStorage.timeKey);
+}
+
+/**
+ * Hiển thị thông tin người dùng
+ */
+function displayUserInfo() {
+    try {
+        const userDataString = localStorage.getItem(AuthConfig.tokenStorage.userKey);
+        if (!userDataString) return;
+        
+        const userData = JSON.parse(userDataString);
+        const userInfoElement = document.getElementById('userInfo');
+        
+        if (userInfoElement && userData.name) {
+            userInfoElement.textContent = userData.name;
+        } else if (userInfoElement && userData.email) {
+            userInfoElement.textContent = userData.email;
+        }
+    } catch (error) {
+        console.error('Lỗi hiển thị thông tin người dùng:', error);
+    }
+}
+
+/**
+ * Khởi tạo chatbot
+ */
+function initChatbot() {
+    const chatContainer = document.getElementById('chatContainer');
+    const messageInput = document.getElementById('messageInput');
+    const sendButton = document.getElementById('sendButton');
+    const fileInput = document.getElementById('fileInput');
+    const filePreviewContainer = document.getElementById('filePreviewContainer');
+    const loadingIndicator = document.getElementById('loadingIndicator');
+    const clearHistoryButton = document.getElementById('clearHistoryButton');
+    const newChatButton = document.getElementById('newChatButton');
+    const historySessions = document.getElementById('historySessions');
+    const recordButton = document.getElementById('recordButton');
+
+    // ... rest of original script.js code ...
+}
+
 // Initial Load
 document.addEventListener('DOMContentLoaded', () => {
+    // Kiểm tra đăng nhập trước khi tải chatbot
+    if (!checkAuthentication()) {
+        return; // Nếu chưa đăng nhập thì dừng lại
+    }
+    
+    // Xử lý nút đăng xuất
+    const logoutButton = document.getElementById('logoutButton');
+    if (logoutButton) {
+        logoutButton.addEventListener('click', handleUserLogout);
+    }
+    
+    // Hiển thị thông tin người dùng nếu có
+    displayUserInfo();
+    
+    // Tải các phiên chat
     loadChatSessions();
     initSpeechRecognition();
     
@@ -1171,57 +1291,3 @@ document.addEventListener('DOMContentLoaded', () => {
         newChatButtonSidebar.addEventListener('click', startNewChat);
     }
 });
-
-// Delete a specific session
-function deleteSession(sessionId) {
-    if (confirm('Bạn có chắc chắn muốn xóa phiên chat này?')) {
-        const index = chatSessions.findIndex(s => s.id === sessionId);
-        if (index !== -1) {
-            chatSessions.splice(index, 1);
-            saveChatSessions();
-            
-            // Nếu đang xóa phiên chat hiện tại
-            if (currentSessionId === sessionId) {
-                chatContainer.innerHTML = '';
-                
-                if (chatSessions.length > 0) {
-                    // Chọn phiên chat mới nhất
-                    currentSessionId = chatSessions[chatSessions.length - 1].id;
-                    loadSession(currentSessionId);
-                } else {
-                    // Nếu không còn phiên chat nào, tạo mới
-                    currentSessionId = null;
-                    startNewChat();
-                }
-            } else {
-                // Chỉ cập nhật sidebar nếu không phải phiên chat hiện tại
-                updateHistorySidebar();
-            }
-            
-            showNotification('Đã xóa phiên chat', 'success');
-        }
-    }
-}
-
-// Hàm hiển thị thông báo
-function showNotification(message, type = 'info') {
-    // Tạo phần tử thông báo
-    const notification = document.createElement('div');
-    notification.className = `fixed top-4 right-4 px-4 py-2 rounded-lg text-white text-sm font-medium animate-slide-up z-50 ${
-        type === 'error' ? 'bg-red-500' : 
-        type === 'success' ? 'bg-green-500' : 
-        type === 'warning' ? 'bg-yellow-500' : 'bg-blue-500'
-    }`;
-    notification.textContent = message;
-    
-    // Thêm vào DOM
-    document.body.appendChild(notification);
-    
-    // Xóa sau 3 giây
-    setTimeout(() => {
-        notification.classList.add('fade-out');
-        setTimeout(() => {
-            document.body.removeChild(notification);
-        }, 300);
-    }, 3000);
-}
