@@ -8,8 +8,8 @@ const AuthConfig = {
      * Cấu hình Google OAuth 2.0
      */
     google: {
-        clientId: '123456789012-abcdefghijklmnopqrstuvwxyz123456.apps.googleusercontent.com',
-        clientSecret: 'GOCSPX-abcdefghijklmnopqrstuvwxyz123456',
+        clientId: 'google-client-id',
+        clientSecret: 'google-client-secret',
         redirectUri: window.location.origin + '/google-callback.html',
         scope: 'email profile',
         responseType: 'code',
