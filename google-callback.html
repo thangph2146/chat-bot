@@ -69,7 +69,7 @@
                     localStorage.setItem(AuthConfig.tokenStorage.timeKey, Date.now());
                     
                     // Chuyển hướng đến trang chính
-                    window.location.href = 'index.html';
+                    window.location.href = 'chatbot.html';
                 } catch (error) {
                     console.error('Lỗi xử lý đăng nhập Google:', error);
                     window.location.href = 'login.html?message=' + encodeURIComponent('Đăng nhập Google thất bại: ' + error.message) + '&type=error';

@@ -11,7 +11,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Nếu đã đăng nhập, chuyển hướng đến trang chính
     if (AuthUtils.isLoggedIn()) {
-        AuthUtils.redirect('index.html');
+        AuthUtils.redirect('chatbot.html');
         return;
     }
     
