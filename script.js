@@ -1024,98 +1024,122 @@ async function callChatbotAPI(message, conversationId = '') {
 }
 
 /**
- * Chuyển đổi văn bản markdown thành HTML
+ * Chuyển đổi văn bản markdown thành HTML (phiên bản tối ưu hơn)
  * @param {string} text - Văn bản markdown cần chuyển đổi
  * @returns {string} HTML đã được render
  */
 function renderMarkdown(text) {
     if (!text) return '';
-    
-    // Xử lý code blocks trước tiên (để tránh xung đột với các regex khác)
+
+    // --- Block Elements ---
+
+    // 1. Code blocks (```...```) - Xử lý trước tiên để tránh xung đột
     let html = text.replace(/```([\w-]*)\n([\s\S]*?)\n```/g, function(match, language, code) {
         language = language.trim();
-        // Thêm class ngôn ngữ nếu được chỉ định
         const languageClass = language ? ` language-${language}` : '';
-        return `<pre><code class="hljs${languageClass}">${code.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</code></pre>`;
+        // Escape HTML characters inside code blocks
+        const escapedCode = code.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        return `<pre><code class="hljs${languageClass}">${escapedCode}</code></pre>`;
     });
-    
-    // Xử lý đường dẫn
-    html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" class="text-primary-600 hover:underline">$1</a>');
-    
-    // Xử lý tiêu đề
-    html = html.replace(/^### (.*$)/gm, '<h3 class="text-lg font-bold my-2">$1</h3>');
-    html = html.replace(/^## (.*$)/gm, '<h2 class="text-xl font-bold my-3">$1</h2>');
-    html = html.replace(/^# (.*$)/gm, '<h1 class="text-2xl font-bold my-4">$1</h1>');
-    
-    // Xử lý đoạn văn mới
-    html = html.replace(/\n\n/g, '<br><br>');
-    
-    // Xử lý in đậm và in nghiêng
-    html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
-    html = html.replace(/\*([^*]+)\*/g, '<em>$1</em>');
-    
-    // Xử lý danh sách không có thứ tự
-    html = html.replace(/^\* (.*$)/gm, '<li class="ml-4 list-disc">$1</li>');
-    html = html.replace(/^- (.*$)/gm, '<li class="ml-4 list-disc">$1</li>');
-    
-    // Xử lý danh sách có thứ tự
-    html = html.replace(/^\d+\. (.*$)/gm, '<li class="ml-4 list-decimal">$1</li>');
-    
-    // Nhóm các mục danh sách thành danh sách UL/OL
-    html = html.replace(/<li class="ml-4 list-disc">(.+?)<\/li>(?!\s*<li)/gs, '<ul class="my-2"><li class="ml-4 list-disc">$1</li></ul>');
-    html = html.replace(/<li class="ml-4 list-decimal">(.+?)<\/li>(?!\s*<li)/gs, '<ol class="my-2"><li class="ml-4 list-decimal">$1</li></ol>');
-    
-    // Tránh lặp ul/ol
-    html = html.replace(/<\/ul>\s*<ul class="my-2">/g, '');
-    html = html.replace(/<\/ol>\s*<ol class="my-2">/g, '');
-    
-    // Ghép nhiều li liên tiếp vào cùng một ul/ol
-    html = html.replace(/<\/li><\/ul>\s*<ul class="my-2"><li/g, '</li><li');
-    html = html.replace(/<\/li><\/ol>\s*<ol class="my-2"><li/g, '</li><li');
-    
-    // Xử lý inline code (sau khi xử lý code blocks)
-    html = html.replace(/`([^`]+)`/g, '<code class="inline-code bg-secondary-100 text-secondary-800 px-1 rounded font-mono">$1</code>');
-    
-    // Xử lý bảng (nếu có)
-    if (text.includes('|')) {
-        // Nhận dạng bảng markdown
-        const tableRegex = /\|(.+)\|\n\|(\s*[-:]+[-:|\s]*)\|\n((\|.+\|\n)+)/g;
-        html = html.replace(tableRegex, function(match, headerRow, separatorRow, bodyRows) {
-            // Xử lý hàng tiêu đề
-            const headers = headerRow.split('|').map(h => h.trim()).filter(h => h);
+
+    // 2. Tables (Kiểm tra sự tồn tại của '|' trước)
+    if (html.includes('|')) {
+        html = html.replace(/^\|(.+)\|\n\|([\s\-:]+[-:|\s]*)\|\n((\|.+\|\n?)+)/gm, function(match, headerRow, separatorRow, bodyRows) {
+            const headers = headerRow.split('|').map(h => h.trim()).filter(Boolean);
             let tableHtml = '<div class="overflow-x-auto my-4"><table class="w-full border-collapse">\n<thead>\n<tr>';
-            
             headers.forEach(header => {
                 tableHtml += `<th class="border border-secondary-300 bg-secondary-100 px-4 py-2 text-left">${header}</th>`;
             });
-            
             tableHtml += '</tr>\n</thead>\n<tbody>';
-            
-            // Xử lý phần thân bảng
+
             const rows = bodyRows.trim().split('\n');
             rows.forEach(row => {
-                const cells = row.split('|').map(c => c.trim()).filter(c => c);
-                if (cells.length) {
+                const cells = row.split('|').map(c => c.trim()).filter(Boolean);
+                // Make sure cells match header count, though markdown is often forgiving
+                if (cells.length > 0) {
                     tableHtml += '\n<tr>';
                     cells.forEach(cell => {
-                        tableHtml += `<td class="border border-secondary-300 px-4 py-2">${cell}</td>`;
+                        // Recursively render markdown inside cells if needed (basic inline for now)
+                        const cellContent = cell
+                            .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+                            .replace(/\*(.+?)\*/g, '<em>$1</em>')
+                            .replace(/`(.+?)`/g, '<code class="inline-code bg-secondary-100 text-secondary-800 px-1 rounded font-mono">$1</code>');
+                        tableHtml += `<td class="border border-secondary-300 px-4 py-2">${cellContent}</td>`;
                     });
                     tableHtml += '</tr>';
                 }
             });
-            
             tableHtml += '\n</tbody>\n</table></div>';
             return tableHtml;
         });
     }
-    
-    // Xử lý các thẻ đặc biệt
-    const blockquoteRegex = /^> (.*)$/gm;
-    html = html.replace(blockquoteRegex, '<blockquote class="pl-4 border-l-4 border-primary-500 italic my-4 text-secondary-600">$1</blockquote>');
-    
-    // Xử lý đường ngang
-    html = html.replace(/^\s*(-{3,}|={3,})\s*$/gm, '<hr class="my-4 border-t border-secondary-300">');
-    
+
+    // 3. Blockquotes (> ...)
+    html = html.replace(/^> (.*$)/gm, '<blockquote class="pl-4 border-l-4 border-primary-500 italic my-4 text-secondary-600">$1</blockquote>');
+
+    // 4. Horizontal Rules (---, ===)
+    html = html.replace(/^\s*(?:-{3,}|={3,})\s*$/gm, '<hr class="my-4 border-t border-secondary-300">');
+
+    // 5. Headers (#, ##, ###) - Kết hợp bằng capturing group
+    html = html.replace(/^(\#{1,3})\s+(.*)$/gm, function(match, hashes, content) {
+        const level = hashes.length;
+        const tag = `h${level}`;
+        const classes = {
+            1: 'text-2xl font-bold my-4',
+            2: 'text-xl font-bold my-3',
+            3: 'text-lg font-bold my-2'
+        };
+        return `<${tag} class="${classes[level]}">${content}</${tag}>`;
+    });
+
+    // 6. Lists (ul, ol) - Xử lý từng dòng và nhóm lại sau
+    html = html.replace(/^([*\-])\s+(.*)$/gm, '<li class="ml-4 list-disc">$2</li>'); // Unordered
+    html = html.replace(/^(\d+)\.\s+(.*)$/gm, '<li class="ml-4 list-decimal" value="$1">$2</li>'); // Ordered
+
+    // Đơn giản hóa việc nhóm list: Wrap consecutive li of the same type
+    html = html.replace(/(?:<li class="ml-4 list-disc">.*?<\/li>\s*)+/g, (match) => {
+        return `<ul class="my-2">${match.replace(/<\/li>\s*<li/g, '</li><li')}</ul>`;
+    });
+    html = html.replace(/(?:<li class="ml-4 list-decimal".*?>.*?<\/li>\s*)+/g, (match) => {
+        return `<ol class="my-2">${match.replace(/<\/li>\s*<li/g, '</li><li')}</ol>`;
+    });
+
+
+    // --- Inline Elements & Paragraphs ---
+
+    // 7. Paragraphs and Line Breaks
+    // Chia thành các đoạn dựa trên dòng trống, xử lý markdown trong từng đoạn
+    html = html.split(/\n\n+/).map(paragraph => {
+        if (!paragraph.trim()) return ''; // Bỏ qua đoạn trống
+
+        // Bỏ qua nếu đoạn đã là thẻ block (list, table, pre, blockquote, hr, h)
+        if (/^\s*<(ul|ol|li|pre|table|blockquote|hr|h[1-6])/i.test(paragraph.trim())) {
+            return paragraph;
+        }
+
+        // Xử lý inline markdown trong đoạn
+        let processedParagraph = paragraph
+            // Links
+            .replace(/\[([^\]]+?)\]\(([^)]+?)\)/g, '<a href="$2" target="_blank" class="text-primary-600 hover:underline">$1</a>')
+            // Bold
+            .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+            // Italic
+            .replace(/\*(.+?)\*/g, '<em>$1</em>')
+            // Inline Code
+            .replace(/`(.+?)`/g, '<code class="inline-code bg-secondary-100 text-secondary-800 px-1 rounded font-mono">$1</code>')
+             // Convert single newlines within a paragraph to <br>
+            .replace(/\n/g, '<br>');
+
+        // Wrap in <p> tag if it's not already part of a block element handled above
+        return `<p class="my-2">${processedParagraph}</p>`;
+
+    }).join('');
+
+    // Dọn dẹp <br> thừa ở đầu/cuối các block
+    html = html.replace(/<p class="my-2">\s*<br>\s*<\/p>/g, ''); // Xóa p chỉ chứa br
+    html = html.replace(/(<\/(?:ul|ol|pre|blockquote|table|h[1-6])>)\s*<br>\s*/gi, '$1');
+    html = html.replace(/<br>\s*(<(?:ul|ol|pre|table|blockquote|hr|h[1-6]))/gi, '$1');
+
     return html;
 }
 
