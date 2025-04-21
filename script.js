@@ -239,7 +239,7 @@ function loadChatSessions() {
     
     try {
         const storedSessions = localStorage.getItem('chatSessions');
-        console.log('Dữ liệu đã lưu trong localStorage:', storedSessions);
+        // console.log('Dữ liệu đã lưu trong localStorage:', storedSessions);
         
         if (storedSessions && storedSessions !== 'undefined' && storedSessions !== 'null') {
             chatSessions = JSON.parse(storedSessions);
@@ -256,7 +256,7 @@ function loadChatSessions() {
                 }
             }
             
-            console.log('Đã tải được', chatSessions.length, 'phiên chat');
+            // console.log('Đã tải được', chatSessions.length, 'phiên chat');
             
             if (chatSessions.length > 0) {
                 // Tạo backup ngay sau khi tải thành công
@@ -347,7 +347,7 @@ function saveChatSessions() {
         // Tạo backup trong sessionStorage
         backupChatSessions();
         
-        console.log('Đã lưu', sessionsToSave.length, 'phiên chat vào localStorage');
+        // console.log('Đã lưu', sessionsToSave.length, 'phiên chat vào localStorage');
         
         // Kiểm tra xem đã lưu thành công chưa
         const savedData = localStorage.getItem('chatSessions');
@@ -780,6 +780,10 @@ function addMessageToChat(message, isUser = false, save = true, customId = null)
         if (message) {
             contentDiv.textContent = message;
         } else {
+            // Đây là placeholder cho bot, thêm class typing ngay
+            if(customId) {
+                 messageDiv.classList.add('typing');
+            }
             contentDiv.className += ' message-content min-h-[24px] min-w-[60px]';
         }
         
@@ -813,10 +817,29 @@ function showLoading(show) {
     }
 }
 
+// Hàm hiển thị/ẩn hiệu ứng đang trả lời
+const typingIndicatorElement = document.getElementById('typingIndicator');
+
+function showTypingIndicator() {
+    if (typingIndicatorElement) {
+        typingIndicatorElement.classList.remove('hidden');
+        // Cuộn xuống dưới cùng
+        setTimeout(() => {
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }, 100); 
+    }
+}
+
+function hideTypingIndicator() {
+    if (typingIndicatorElement) {
+        typingIndicatorElement.classList.add('hidden');
+    }
+}
+
 // Hàm gọi API cho chatbot từ trolyai.hub.edu.vn với hỗ trợ streaming
 async function callChatbotAPI(message, conversationId = '') {
-    showLoading(true);
-    
+    showTypingIndicator(); // Hiển thị hiệu ứng đang gõ
+
     try {
         // Tạo message placeholder để hiển thị streaming response
         const placeholderId = `msg-${Date.now()}`;
@@ -841,9 +864,7 @@ async function callChatbotAPI(message, conversationId = '') {
         if (!response.ok) {
             throw new Error(`Lỗi kết nối API: ${response.status} ${response.statusText}`);
         }
-        
-        showLoading(false);
-        
+
         // Xử lý stream data
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
@@ -878,8 +899,8 @@ async function callChatbotAPI(message, conversationId = '') {
         }
         
         // Thêm hiệu ứng typing
-        messageElement.classList.add('typing');
-        
+        // messageElement.classList.add('typing');
+
         // Tạo container cho nội dung markdown
         if (!textElement.querySelector('.markdown-content')) {
             const markdownContainer = document.createElement('div');
@@ -925,12 +946,13 @@ async function callChatbotAPI(message, conversationId = '') {
                             }
                         } else if (data.event === 'message_end' || data.event === 'done') {
                             // Stream đã hoàn tất
-                            messageElement.classList.remove('typing');
-                            
+                            // messageElement.classList.remove('typing');
+                            hideTypingIndicator(); // Ẩn hiệu ứng đang gõ khi xong
+
                             // Lưu metadata nếu có
-                            if (data.metadata) {
-                                console.log('Metadata từ API:', data.metadata);
-                            }
+                            // if (data.metadata) {
+                            //     console.log('Metadata từ API:', data.metadata);
+                            // }
                         }
                     } catch (e) {
                         console.error('Lỗi khi parse JSON từ stream:', e);
@@ -960,7 +982,7 @@ async function callChatbotAPI(message, conversationId = '') {
             conversationId: conversationIdFromStream
         };
     } catch (error) {
-        showLoading(false);
+        hideTypingIndicator(); // Ẩn hiệu ứng đang gõ khi có lỗi
         console.error('API Call Error:', error);
         
         // Nếu lỗi xảy ra sau khi đã tạo message placeholder, cập nhật lại
