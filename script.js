@@ -797,6 +797,17 @@ function addMessageToChat(message, isUser = false, save = true, customId = null)
         messageDiv.appendChild(messageRow);
     }
     
+    // Render markdown và highlight code cho tin nhắn bot đã lưu
+    if (!isUser && !save && message) {
+        const contentDiv = messageDiv.querySelector('.message-content, div[class^="bg-secondary-100"]'); // Tìm đúng content div
+        if (contentDiv) {
+            contentDiv.innerHTML = renderMarkdown(message);
+            highlightCodeBlocks(contentDiv);
+        } else {
+            console.warn("Không tìm thấy content div để render markdown cho tin nhắn đã lưu:", messageDiv);
+        }
+    }
+    
     chatContainer.appendChild(messageDiv);
     chatContainer.scrollTop = chatContainer.scrollHeight;
     
