@@ -1,8 +1,6 @@
 const chatContainer = document.getElementById('chatContainer');
 const messageInput = document.getElementById('messageInput');
 const sendButton = document.getElementById('sendButton');
-const fileInput = document.getElementById('fileInput');
-const filePreviewContainer = document.getElementById('filePreviewContainer');
 const loadingIndicator = document.getElementById('loadingIndicator');
 const clearHistoryButton = document.getElementById('clearHistoryButton');
 const newChatButton = document.getElementById('newChatButton');
@@ -18,7 +16,6 @@ const API_CONFIG = {
 
 let chatSessions = []; // Mảng lưu các phiên chat
 let currentSessionId = null;
-let attachedFiles = [];
 let recognition = null;
 let isRecording = false;
 let isProcessingVoice = false; // Trạng thái xử lý giọng nói
@@ -275,7 +272,7 @@ function loadChatSessions() {
                 const currentSession = chatSessions.find(s => s.id === currentSessionId);
                 if (currentSession && Array.isArray(currentSession.messages)) {
                     currentSession.messages.forEach(msg => {
-                        addMessageToChat(msg.message, msg.isUser, [], false);
+                        addMessageToChat(msg.message, msg.isUser, false);
                     });
                     
                     // Cuộn xuống cuối cùng
@@ -448,7 +445,7 @@ function loadSession(sessionId) {
     
     if (session) {
         session.messages.forEach(msg => {
-            addMessageToChat(msg.message, msg.isUser, [], false);
+            addMessageToChat(msg.message, msg.isUser, false);
         });
         chatContainer.scrollTop = chatContainer.scrollHeight;
     }
@@ -727,8 +724,8 @@ function formatTime(date) {
 }
 
 // Thêm tin nhắn vào chat
-function addMessageToChat(message, isUser = false, files = [], save = true, customId = null) {
-    if (!message && (!files || files.length === 0) && !customId) return;
+function addMessageToChat(message, isUser = false, save = true, customId = null) {
+    if (!message && !customId) return;
     
     // Ẩn tin nhắn chào mừng nếu đang hiển thị
     const welcomeElement = document.getElementById('welcomeMessage');
@@ -790,113 +787,6 @@ function addMessageToChat(message, isUser = false, files = [], save = true, cust
         messageDiv.appendChild(messageRow);
     }
     
-    // Hiển thị file đính kèm
-    if (files && files.length > 0) {
-        const fileContainer = document.createElement('div');
-        fileContainer.className = 'flex flex-wrap gap-2 mb-2 ' + (isUser ? 'justify-end' : 'justify-start');
-        
-        files.forEach(file => {
-            const filePreview = document.createElement('div');
-            filePreview.className = 'bg-white rounded-lg shadow-sm p-2 border border-secondary-200 ' + 
-                                   (isUser ? 'ml-auto' : 'mr-auto');
-            
-            if (file.type.startsWith('image/')) {
-                const img = document.createElement('img');
-                img.src = URL.createObjectURL(file);
-                img.alt = file.name;
-                img.className = 'w-32 h-32 object-cover rounded-md';
-                filePreview.appendChild(img);
-                
-                const fileInfo = document.createElement('div');
-                fileInfo.className = 'text-xs text-secondary-500 mt-1 truncate max-w-[128px]';
-                fileInfo.textContent = file.name;
-                filePreview.appendChild(fileInfo);
-            } else {
-                const fileInfo = document.createElement('div');
-                fileInfo.className = 'flex flex-col items-center p-2';
-                
-                // Icon hiển thị dựa vào loại file
-                const icon = document.createElement('div');
-                if (file.type.includes('pdf')) {
-                    icon.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 mx-auto text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                    </svg>`;
-                } else if (file.type.includes('word') || file.type.includes('doc')) {
-                    icon.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 mx-auto text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>`;
-                } else {
-                    icon.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 mx-auto text-secondary-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>`;
-                }
-                
-                fileInfo.appendChild(icon);
-                
-                const text = document.createElement('p');
-                text.textContent = file.name.length > 15 ? file.name.substring(0, 12) + '...' : file.name;
-                text.className = 'text-xs truncate mt-2 font-medium';
-                fileInfo.appendChild(text);
-                
-                const size = document.createElement('p');
-                size.textContent = formatFileSize(file.size);
-                size.className = 'text-xs text-secondary-500';
-                fileInfo.appendChild(size);
-                
-                filePreview.appendChild(fileInfo);
-            }
-            
-            // Thêm hành động khi click vào file
-            filePreview.addEventListener('click', () => {
-                if (file.type.startsWith('image/')) {
-                    // Hiển thị ảnh lớn hơn
-                    const modal = document.createElement('div');
-                    modal.className = 'fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 fade-in';
-                    
-                    const modalContent = document.createElement('div');
-                    modalContent.className = 'bg-white rounded-xl p-4 max-w-3xl max-h-[90vh] overflow-auto relative';
-                    
-                    const closeButton = document.createElement('button');
-                    closeButton.className = 'absolute top-2 right-2 bg-secondary-800 text-white rounded-full p-1';
-                    closeButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                    </svg>`;
-                    closeButton.onclick = () => document.body.removeChild(modal);
-                    
-                    const modalImg = document.createElement('img');
-                    modalImg.src = URL.createObjectURL(file);
-                    modalImg.className = 'max-w-full max-h-[80vh] object-contain';
-                    
-                    const filename = document.createElement('p');
-                    filename.className = 'text-center text-secondary-600 mt-2';
-                    filename.textContent = file.name;
-                    
-                    modalContent.appendChild(closeButton);
-                    modalContent.appendChild(modalImg);
-                    modalContent.appendChild(filename);
-                    modal.appendChild(modalContent);
-                    
-                    modal.addEventListener('click', (e) => {
-                        if (e.target === modal) {
-                            document.body.removeChild(modal);
-                        }
-                    });
-                    
-                    document.body.appendChild(modal);
-                }
-            });
-            
-            fileContainer.appendChild(filePreview);
-        });
-        
-        // Thêm file container vào tin nhắn trước hoặc sau nội dung, tùy thuộc vào loại tin nhắn
-        if (isUser) {
-            messageDiv.insertBefore(fileContainer, messageDiv.firstChild);
-        } else {
-            messageDiv.appendChild(fileContainer);
-        }
-    }
-
     chatContainer.appendChild(messageDiv);
     chatContainer.scrollTop = chatContainer.scrollHeight;
     
@@ -905,14 +795,9 @@ function addMessageToChat(message, isUser = false, files = [], save = true, cust
         const session = chatSessions.find(s => s.id === currentSessionId);
         if (session) {
             session.messages.push({ 
-                message: message || '(Đã gửi file)', 
-                isUser, 
-                timestamp: now.toISOString(),
-                files: files.map(file => ({
-                    name: file.name,
-                    type: file.type,
-                    size: file.size
-                }))
+                message: message || '', 
+                isUser,
+                timestamp: now.toISOString()
             });
             saveChatSessions();
         }
@@ -935,7 +820,7 @@ async function callChatbotAPI(message, conversationId = '') {
     try {
         // Tạo message placeholder để hiển thị streaming response
         const placeholderId = `msg-${Date.now()}`;
-        const messageElement = addMessageToChat('', false, [], true, placeholderId);
+        const messageElement = addMessageToChat('', false, true, placeholderId);
         
         // Streaming mode - fetch với stream true
         const response = await fetch('http://trolyai.hub.edu.vn/v1/chat-messages', {
@@ -1059,6 +944,13 @@ async function callChatbotAPI(message, conversationId = '') {
             const session = chatSessions.find(s => s.id === currentSessionId);
             if (session) {
                 session.conversationId = conversationIdFromStream;
+                 // Lưu lại tin nhắn cuối cùng của bot sau khi streaming hoàn tất
+                if (session.messages.length > 0) {
+                    const lastMessageIndex = session.messages.length - 1;
+                    if (!session.messages[lastMessageIndex].isUser && session.messages[lastMessageIndex].message === '') {
+                        session.messages[lastMessageIndex].message = accumulatedResponse || '(Không có phản hồi)';
+                    }
+                }
                 saveChatSessions();
             }
         }
@@ -1242,17 +1134,13 @@ function highlightCodeBlocks(container) {
 // Xử lý gửi tin nhắn
 async function handleSendMessage() {
     const message = messageInput.value.trim();
-    const filesToSend = [...attachedFiles]; // Tạo bản sao mảng files
     
     // Kiểm tra có nội dung cần gửi không
-    if (!message && filesToSend.length === 0) return;
+    if (!message) return;
     
-    // Xóa nội dung input và file đính kèm
-    addMessageToChat(message || 'Đã gửi file', true, filesToSend);
+    // Xóa nội dung input
+    addMessageToChat(message, true);
     messageInput.value = '';
-    filePreviewContainer.innerHTML = '';
-    attachedFiles = [];
-    fileInput.value = '';
     
     // Lấy conversationId từ phiên hiện tại (nếu có)
     let conversationId = '';
@@ -1278,15 +1166,10 @@ async function handleSendMessage() {
                 updateHistorySidebar();
             }
         }
-    } else if (filesToSend.length > 0) {
-        // Xử lý khi chỉ gửi file, không có nội dung tin nhắn
-        showLoading(true);
-        // Giả lập xử lý file
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        showLoading(false);
-        
-        // Giả lập phản hồi khi nhận file
-        addMessageToChat('Cảm ơn bạn đã gửi file. Tôi đã nhận được và sẽ xem xét nội dung.', false);
+    } else {
+        // Xử lý khi không có nội dung tin nhắn (trước đây là chỉ gửi file)
+        // Có thể thêm thông báo yêu cầu nhập tin nhắn
+        showNotification('Vui lòng nhập tin nhắn để gửi', 'warning');
     }
 }
 
@@ -1318,94 +1201,6 @@ clearHistoryButton.addEventListener('click', clearChatHistory);
 
 recordButton.addEventListener('click', toggleRecording);
 
-fileInput.addEventListener('change', (e) => {
-    const files = Array.from(e.target.files);
-    if (files.length === 0) return;
-    
-    // Thêm files vào mảng
-    attachedFiles.push(...files);
-    
-    // Xóa previews cũ
-    filePreviewContainer.innerHTML = '';
-    
-    // Hiển thị preview cho mỗi file
-    attachedFiles.forEach((file, index) => {
-        const previewDiv = document.createElement('div');
-        previewDiv.className = 'relative flex items-center gap-2 bg-secondary-100 p-2 rounded-lg shadow-sm hover:shadow-md transition-all';
-        
-        // Preview khác nhau tùy loại file
-        if (file.type.startsWith('image/')) {
-            const img = document.createElement('img');
-            img.src = URL.createObjectURL(file);
-            img.alt = file.name;
-            img.className = 'w-10 h-10 object-cover rounded';
-            previewDiv.appendChild(img);
-        } else if (file.type.includes('pdf')) {
-            const icon = document.createElement('div');
-            icon.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-            </svg>`;
-            previewDiv.appendChild(icon);
-        } else if (file.type.includes('word') || file.type.includes('doc')) {
-            const icon = document.createElement('div');
-            icon.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>`;
-            previewDiv.appendChild(icon);
-        } else {
-            const icon = document.createElement('div');
-            icon.textContent = '📁';
-            icon.className = 'text-2xl';
-            previewDiv.appendChild(icon);
-        }
-        
-        // Thông tin file
-        const fileInfo = document.createElement('div');
-        fileInfo.className = 'flex flex-col';
-        
-        const nameSpan = document.createElement('span');
-        nameSpan.textContent = file.name.length > 15 ? file.name.substring(0, 12) + '...' : file.name;
-        nameSpan.className = 'text-xs font-medium';
-        fileInfo.appendChild(nameSpan);
-        
-        const sizeSpan = document.createElement('span');
-        sizeSpan.textContent = formatFileSize(file.size);
-        sizeSpan.className = 'text-xs text-secondary-500';
-        fileInfo.appendChild(sizeSpan);
-        
-        previewDiv.appendChild(fileInfo);
-        
-        // Nút xóa file
-        const removeButton = document.createElement('button');
-        removeButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-        </svg>`;
-        removeButton.className = 'absolute -top-2 -right-2 bg-red-500 text-white rounded-full text-xs w-5 h-5 flex items-center justify-center hover:bg-red-600 hover:scale-110 transition-all';
-        removeButton.onclick = (event) => {
-            event.stopPropagation();
-            
-            // Xóa file khỏi mảng
-            const fileIndex = attachedFiles.findIndex(f => f === file);
-            if (fileIndex > -1) {
-                attachedFiles.splice(fileIndex, 1);
-            }
-            
-            // Xóa preview
-            previewDiv.remove();
-        };
-        previewDiv.appendChild(removeButton);
-        
-        filePreviewContainer.appendChild(previewDiv);
-    });
-});
-
-// Format kích thước file
-function formatFileSize(bytes) {
-    if (bytes < 1024) return bytes + ' B';
-    if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
-    return (bytes / 1048576).toFixed(1) + ' MB';
-}
-
 /**
  * Khởi tạo chatbot
  */
@@ -1413,8 +1208,6 @@ function initChatbot() {
     const chatContainer = document.getElementById('chatContainer');
     const messageInput = document.getElementById('messageInput');
     const sendButton = document.getElementById('sendButton');
-    const fileInput = document.getElementById('fileInput');
-    const filePreviewContainer = document.getElementById('filePreviewContainer');
     const loadingIndicator = document.getElementById('loadingIndicator');
     const clearHistoryButton = document.getElementById('clearHistoryButton');
     const newChatButton = document.getElementById('newChatButton');
