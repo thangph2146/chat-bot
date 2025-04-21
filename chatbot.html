@@ -64,8 +64,10 @@
         }
         /* Hiệu ứng ellipsis động */
         .ellipsis-animation span {
+            display: inline-block; /* Cần để áp dụng transform */
             opacity: 0;
-            animation: ellipsis-dot 1.4s infinite;
+            transform: scale(0.5); /* Bắt đầu nhỏ */
+            animation: ellipsis-scale 1.4s infinite ease-in-out;
         }
         .ellipsis-animation span:nth-child(1) {
             animation-delay: 0.0s;
@@ -76,9 +78,14 @@
         .ellipsis-animation span:nth-child(3) {
             animation-delay: 0.4s;
         }
-        @keyframes ellipsis-dot {
+        /* @keyframes ellipsis-dot {
             0%, 80%, 100% { opacity: 0; }
             40% { opacity: 1; }
+        } */
+        @keyframes ellipsis-scale {
+            0% { transform: scale(0.5); opacity: 0; }
+            50% { transform: scale(1); opacity: 1; }
+            100% { transform: scale(0.5); opacity: 0; }
         }
     </style>
     <!-- Script và tích hợp TW Config -->
@@ -193,7 +200,7 @@
                     </button>
                     
                     <button id="sendButton" class="p-2 md:p-3 bg-primary-600 text-white rounded-lg hover:shadow-glow hover:bg-primary-700 transition-all duration-300 flex items-center justify-center relative overflow-hidden group transform hover:scale-105 animate-pulse">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 md:h-6 md:w-6" viewBox="0 0 20 20" fill="currentColor">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 md:h-6 md:w-6 rotate-90 hover:rotate-90 transition-transform duration-300" viewBox="0 0 20 20" fill="currentColor">
                             <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
                         </svg>
                         <span class="invisible opacity-0 absolute bottom-[-30px] left-1/2 transform -translate-x-1/2 bg-secondary-800 text-white px-2 py-1 rounded text-xs whitespace-nowrap transition-opacity group-hover:visible group-hover:opacity-90 z-10">Gửi tin nhắn</span>
