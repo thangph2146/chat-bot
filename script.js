@@ -780,9 +780,15 @@ function addMessageToChat(message, isUser = false, save = true, customId = null)
         if (message) {
             contentDiv.textContent = message;
         } else {
-            // Đây là placeholder cho bot, thêm class typing ngay
+            // Đây là placeholder cho bot
             if(customId) {
-                 messageDiv.classList.add('typing');
+                 // Thêm cấu trúc cho hiệu ứng ellipsis và nội dung markdown
+                 contentDiv.innerHTML = `
+                    <div class="ellipsis-animation">
+                        <span>.</span><span>.</span><span>.</span>
+                    </div>
+                    <div class="markdown-content" style="display: none;"></div>
+                 `;
             }
             contentDiv.className += ' message-content min-h-[24px] min-w-[60px]';
         }
@@ -817,28 +823,9 @@ function showLoading(show) {
     }
 }
 
-// Hàm hiển thị/ẩn hiệu ứng đang trả lời
-const typingIndicatorElement = document.getElementById('typingIndicator');
-
-function showTypingIndicator() {
-    if (typingIndicatorElement) {
-        typingIndicatorElement.classList.remove('hidden');
-        // Cuộn xuống dưới cùng
-        setTimeout(() => {
-            chatContainer.scrollTop = chatContainer.scrollHeight;
-        }, 100); 
-    }
-}
-
-function hideTypingIndicator() {
-    if (typingIndicatorElement) {
-        typingIndicatorElement.classList.add('hidden');
-    }
-}
-
 // Hàm gọi API cho chatbot từ trolyai.hub.edu.vn với hỗ trợ streaming
 async function callChatbotAPI(message, conversationId = '') {
-    showTypingIndicator(); // Hiển thị hiệu ứng đang gõ
+    // showTypingIndicator(); // Hiển thị hiệu ứng đang gõ
 
     try {
         // Tạo message placeholder để hiển thị streaming response
@@ -889,29 +876,30 @@ async function callChatbotAPI(message, conversationId = '') {
             if (contentDiv) {
                 // Đảm bảo có class message-content
                 contentDiv.classList.add('message-content');
-                textElement = contentDiv;
+                 // Placeholder đã được tạo trong addMessageToChat, không cần tạo lại ở đây 
+                 // textElement = contentDiv; 
             } else {
-                const newContentDiv = document.createElement('div');
-                newContentDiv.className = 'bg-secondary-100 text-secondary-800 px-4 py-2 rounded-t-2xl rounded-br-2xl max-w-[85%] shadow-sm message-content';
-                messageRow.appendChild(newContentDiv);
-                textElement = newContentDiv;
+                // Trường hợp này không nên xảy ra nếu addMessageToChat đã chạy đúng
+                console.error("Không tìm thấy contentDiv cho placeholder");
+                throw new Error('Không tìm thấy contentDiv cho placeholder');
+                // const newContentDiv = document.createElement('div');
+                // newContentDiv.className = 'bg-secondary-100 text-secondary-800 px-4 py-2 rounded-t-2xl rounded-br-2xl max-w-[85%] shadow-sm message-content';
+                // messageRow.appendChild(newContentDiv);
+                // textElement = newContentDiv;
             }
         }
         
-        // Thêm hiệu ứng typing
-        // messageElement.classList.add('typing');
+        // Lấy tham chiếu đến các phần tử con
+        const ellipsisDiv = messageElement.querySelector('.ellipsis-animation');
+        const markdownContainer = messageElement.querySelector('.markdown-content');
 
-        // Tạo container cho nội dung markdown
-        if (!textElement.querySelector('.markdown-content')) {
-            const markdownContainer = document.createElement('div');
-            markdownContainer.className = 'markdown-content';
-            textElement.appendChild(markdownContainer);
+        if (!ellipsisDiv || !markdownContainer) {
+            console.error("Không tìm thấy phần tử ellipsis hoặc markdown trong placeholder:", messageElement);
+            throw new Error('Cấu trúc placeholder không đúng.');
         }
         
-        const markdownContainer = textElement.querySelector('.markdown-content');
-        if (!markdownContainer) {
-            throw new Error('Không thể tạo container cho nội dung markdown');
-        }
+        // markdownContainer.innerHTML = '...'; // Không cần đặt "..." ở đây nữa
+        let isFirstChunk = true; // Cờ để kiểm tra chunk đầu tiên
         
         while (true) {
             const { done, value } = await reader.read();
@@ -929,8 +917,15 @@ async function callChatbotAPI(message, conversationId = '') {
                             // Cập nhật tin nhắn streaming
                             accumulatedResponse += data.answer || '';
                             
-                            // Render nội dung markdown
-                            markdownContainer.innerHTML = renderMarkdown(accumulatedResponse);
+                            // Render nội dung markdown, xóa "..." nếu là chunk đầu tiên
+                            if (isFirstChunk) {
+                                if (ellipsisDiv) ellipsisDiv.style.display = 'none'; // Ẩn ellipsis
+                                if (markdownContainer) markdownContainer.style.display = 'block'; // Hiện markdown container
+                                markdownContainer.innerHTML = renderMarkdown(accumulatedResponse);
+                                isFirstChunk = false;
+                            } else {
+                                markdownContainer.innerHTML = renderMarkdown(accumulatedResponse);
+                            }
                             
                             // Áp dụng highlight cho code blocks sau khi thêm nội dung markdown
                             setTimeout(() => {
@@ -946,13 +941,21 @@ async function callChatbotAPI(message, conversationId = '') {
                             }
                         } else if (data.event === 'message_end' || data.event === 'done') {
                             // Stream đã hoàn tất
-                            // messageElement.classList.remove('typing');
-                            hideTypingIndicator(); // Ẩn hiệu ứng đang gõ khi xong
-
-                            // Lưu metadata nếu có
-                            // if (data.metadata) {
-                            //     console.log('Metadata từ API:', data.metadata);
-                            // }
+                            // messageElement.classList.remove('typing'); // Bỏ class typing
+                            // Đảm bảo ellipsis bị ẩn nếu stream kết thúc mà không có message event nào
+                            if (isFirstChunk && ellipsisDiv) {
+                                ellipsisDiv.style.display = 'none';
+                                if (markdownContainer) markdownContainer.style.display = 'block'; // Hiện container rỗng nếu không có nội dung
+                            }
+                             
+                        } else if (data.event === 'error') {
+                             console.error('Lỗi từ API stream:', data);
+                             if (ellipsisDiv) ellipsisDiv.style.display = 'none';
+                             if (markdownContainer) {
+                                markdownContainer.style.display = 'block';
+                                markdownContainer.innerHTML = renderMarkdown(data.error || 'Lỗi không xác định từ API');
+                             }
+                             // Có thể thêm xử lý lỗi cụ thể ở đây
                         }
                     } catch (e) {
                         console.error('Lỗi khi parse JSON từ stream:', e);
@@ -982,17 +985,21 @@ async function callChatbotAPI(message, conversationId = '') {
             conversationId: conversationIdFromStream
         };
     } catch (error) {
-        hideTypingIndicator(); // Ẩn hiệu ứng đang gõ khi có lỗi
+        // hideTypingIndicator(); // Ẩn hiệu ứng đang gõ khi có lỗi
         console.error('API Call Error:', error);
         
         // Nếu lỗi xảy ra sau khi đã tạo message placeholder, cập nhật lại
         const errorPlaceholder = document.getElementById(placeholderId);
         if (errorPlaceholder) {
-            const textElem = errorPlaceholder.querySelector('.message-content');
-            if (textElem) {
-                textElem.textContent = 'Xin lỗi, đã có lỗi xảy ra khi kết nối đến trợ lý. Vui lòng thử lại sau.';
+            const ellipsisDiv = errorPlaceholder.querySelector('.ellipsis-animation');
+            const markdownContainer = errorPlaceholder.querySelector('.markdown-content');
+            
+            if (ellipsisDiv) ellipsisDiv.style.display = 'none'; // Ẩn ellipsis khi lỗi
+            if (markdownContainer) { 
+                 markdownContainer.style.display = 'block'; // Hiện markdown container để hiển thị lỗi
+                 markdownContainer.textContent = 'Xin lỗi, đã có lỗi xảy ra khi kết nối đến trợ lý. Vui lòng thử lại sau.';
             }
-            errorPlaceholder.classList.remove('typing');
+            // errorPlaceholder.classList.remove('typing'); // Bỏ class typing
         } else {
             // Nếu không tìm thấy placeholder, tạo message lỗi mới
             addMessageToChat('Xin lỗi, đã có lỗi xảy ra khi kết nối đến trợ lý. Vui lòng thử lại sau.', false);
