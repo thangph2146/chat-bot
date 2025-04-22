@@ -1,30 +1,126 @@
 // js/login-page.js
 
+// *** QUAN TRỌNG: Thay thế bằng Google Client ID thật của bạn ***
+const GOOGLE_CLIENT_ID = "869926026173-n42bm8kgaa4t53q64qcc4epmf61qt6jo.apps.googleusercontent.com";
+
+// Hàm callback xử lý khi Google trả về thông tin đăng nhập
+async function handleGoogleCredentialResponse(response) {
+    console.log("Received Google Credential Response:", response);
+    const idToken = response.credential;
+
+    // Lấy các element UI để hiển thị trạng thái chờ/lỗi
+    const errorMessageDiv = document.getElementById('errorMessage');
+    const errorTextElement = document.getElementById('errorText');
+    const googleSignInButtonDiv = document.getElementById('googleSignInButtonDiv'); // Div chứa nút Google
+
+    if (!errorMessageDiv || !errorTextElement || !googleSignInButtonDiv) {
+        console.error("UI elements for Google Sign-In feedback not found.");
+        alert("Lỗi giao diện, không thể xử lý đăng nhập Google.");
+        return;
+    }
+
+    errorMessageDiv.style.display = 'none'; // Ẩn lỗi cũ
+    errorTextElement.textContent = '';
+
+    // --- Hiển thị trạng thái chờ (có thể thêm spinner vào div hoặc làm mờ nút) ---
+    // Ví dụ: Làm mờ nút Google trong khi chờ backend
+    googleSignInButtonDiv.style.opacity = '0.6';
+    googleSignInButtonDiv.style.pointerEvents = 'none';
+    errorTextElement.textContent = 'Đang xác thực với máy chủ...';
+    errorMessageDiv.style.display = 'flex'; 
+    errorMessageDiv.classList.remove('text-red-600'); // Bỏ màu đỏ lỗi
+    errorMessageDiv.classList.add('text-blue-600'); // Màu xanh thông báo
+
+    try {
+        console.log("Sending Google ID Token to backend:", idToken);
+        const googleLoginResult = await handleGoogleLogin(idToken); // Gọi hàm từ login.js
+
+        if (googleLoginResult.success) {
+            errorMessageDiv.style.display = 'none';
+            // Không cần đổi text nút vì Google quản lý nút
+            window.location.href = 'index.html'; // Chuyển hướng khi thành công
+        } else {
+            // Lỗi từ backend
+            errorTextElement.textContent = googleLoginResult.message || 'Đăng nhập bằng Google thất bại từ máy chủ.';
+            errorMessageDiv.classList.remove('text-blue-600');
+            errorMessageDiv.classList.add('text-red-600');
+            errorMessageDiv.style.display = 'flex';
+        }
+    } catch (error) {
+        console.error("Error sending Google token to backend:", error);
+        errorTextElement.textContent = 'Lỗi kết nối hoặc xử lý phía máy chủ khi đăng nhập Google.';
+        errorMessageDiv.classList.remove('text-blue-600');
+        errorMessageDiv.classList.add('text-red-600');
+        errorMessageDiv.style.display = 'flex';
+    } finally {
+        // --- Khôi phục trạng thái nút Google ---
+        googleSignInButtonDiv.style.opacity = '1';
+        googleSignInButtonDiv.style.pointerEvents = 'auto';
+        // Có thể ẩn thông báo chờ nếu không có lỗi
+        if (errorMessageDiv.classList.contains('text-blue-600')) {
+           errorMessageDiv.style.display = 'none';
+        }
+    }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     const loginForm = document.getElementById('loginForm');
     const emailInput = document.getElementById('email');
     const passwordInput = document.getElementById('password');
     const errorMessageDiv = document.getElementById('errorMessage');
-    const errorTextElement = document.getElementById('errorText'); // Get the span for error text
-    const submitButton = document.getElementById('loginSubmitButton'); // Use specific ID
+    const errorTextElement = document.getElementById('errorText');
+    const submitButton = document.getElementById('loginSubmitButton');
     const buttonText = submitButton ? submitButton.querySelector('.button-text') : null;
     const buttonSpinner = submitButton ? submitButton.querySelector('.button-spinner') : null;
 
-    // Check for necessary elements
-    if (!loginForm || !emailInput || !passwordInput || !errorMessageDiv || !errorTextElement || !submitButton || !buttonText || !buttonSpinner) {
+    // Lấy div chứa nút Google (thay vì nút cũ)
+    const googleSignInButtonDiv = document.getElementById('googleSignInButtonDiv');
+
+    // Check for necessary elements (bỏ các element của nút Google cũ, thêm div mới)
+    if (!loginForm || !emailInput || !passwordInput || !errorMessageDiv || !errorTextElement || !submitButton || !buttonText || !buttonSpinner || !googleSignInButtonDiv) {
         console.error("Login page UI elements not found. Initialization failed.");
+        if (errorTextElement && errorMessageDiv) {
+            errorTextElement.textContent = 'Lỗi tải giao diện trang đăng nhập.';
+            errorMessageDiv.style.display = 'flex';
+        }
         return;
     }
 
-    // Đảm bảo hàm handleLogin đã được tải từ js/login.js
-    if (typeof handleLogin !== 'function') {
-        console.error("Lỗi nghiêm trọng: Hàm handleLogin() không tìm thấy. Đảm bảo js/login.js đã được tải trước js/login-page.js.");
-        errorTextElement.textContent = 'Lỗi tải trang. Vui lòng thử lại.';
-        errorMessageDiv.style.display = 'flex'; // Show error container
+    // Đảm bảo hàm handleLogin và handleGoogleLogin đã được tải
+    if (typeof handleLogin !== 'function' || typeof handleGoogleLogin !== 'function') {
+        console.error("Lỗi nghiêm trọng: Hàm handleLogin() hoặc handleGoogleLogin() không tìm thấy.");
+        errorTextElement.textContent = 'Lỗi tải chức năng đăng nhập. Vui lòng thử lại.';
+        errorMessageDiv.style.display = 'flex';
         submitButton.disabled = true;
+        // Không cần disable nút Google vì nó được quản lý bởi thư viện
         return;
     }
 
+    // --- Khởi tạo Google Sign In --- 
+    // Đợi thư viện Google tải xong
+    window.onload = function () {
+      try {
+        google.accounts.id.initialize({
+          client_id: GOOGLE_CLIENT_ID, 
+          callback: handleGoogleCredentialResponse // Hàm sẽ được gọi sau khi đăng nhập Google thành công
+        });
+        
+        // Render nút đăng nhập Google vào div đã chuẩn bị
+        google.accounts.id.renderButton(
+          googleSignInButtonDiv, // Element div để render nút vào
+          { theme: "outline", size: "large", type: "standard", text: "signin_with", shape: "rectangular", logo_alignment: "left" }  // Tùy chỉnh giao diện nút
+        );
+        
+        // Tùy chọn: Hiển thị One Tap prompt (đăng nhập nhanh nếu đã từng đăng nhập)
+        // google.accounts.id.prompt(); 
+      } catch (error) {
+          console.error("Lỗi khi khởi tạo Google Sign-In:", error);
+          errorTextElement.textContent = 'Không thể khởi tạo đăng nhập Google. Vui lòng tải lại trang.';
+          errorMessageDiv.style.display = 'flex';
+      }
+    };
+
+    // --- Xử lý Submit Form Email/Password (giữ nguyên) --- 
     loginForm.addEventListener('submit', async function(event) {
         event.preventDefault();
 
@@ -36,50 +132,43 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (!email || !password) {
             errorTextElement.textContent = 'Vui lòng nhập email và mật khẩu.';
-            errorMessageDiv.style.display = 'flex'; // Show error container
+            errorMessageDiv.style.display = 'flex';
             return;
         }
 
-        // --- Xử lý trạng thái chờ --- 
         submitButton.disabled = true;
-        buttonText.textContent = 'Đang xử lý...'; // Change text
-        buttonSpinner.classList.remove('hidden'); // Show spinner
+        buttonText.textContent = 'Đang xử lý...';
+        buttonSpinner.classList.remove('hidden');
 
-        // --- Gọi hàm handleLogin (API) --- 
         try {
-            const loginResult = await handleLogin(email, password); // Call async handleLogin from login.js
+            const loginResult = await handleLogin(email, password);
 
             if (loginResult.success) {
                 errorMessageDiv.style.display = 'none';
-                // Optional: Show a success message briefly before redirecting
                 buttonText.textContent = 'Thành công!';
                 window.location.href = 'index.html';
             } else {
-                // Login failed
                 errorTextElement.textContent = loginResult.message || 'Email hoặc mật khẩu không đúng.';
-                errorMessageDiv.style.display = 'flex'; // Show error container
+                errorMessageDiv.style.display = 'flex';
                 passwordInput.value = '';
                 emailInput.focus();
                 loginForm.classList.add('animate-shake');
                 setTimeout(() => loginForm.classList.remove('animate-shake'), 500);
-                // Reset button state
                 submitButton.disabled = false;
-                buttonText.textContent = 'Đăng nhập'; // Restore original text
-                buttonSpinner.classList.add('hidden'); // Hide spinner
+                buttonText.textContent = 'Đăng nhập';
+                buttonSpinner.classList.add('hidden');
             }
         } catch (error) {
-            // Unexpected error
             console.error("Unexpected error during login form submission:", error);
             errorTextElement.textContent = 'Đã xảy ra lỗi không mong muốn. Vui lòng thử lại.';
-            errorMessageDiv.style.display = 'flex'; // Show error container
-            // Reset button state
+            errorMessageDiv.style.display = 'flex';
             submitButton.disabled = false;
-            buttonText.textContent = 'Đăng nhập'; // Restore original text
-            buttonSpinner.classList.add('hidden'); // Hide spinner
+            buttonText.textContent = 'Đăng nhập';
+            buttonSpinner.classList.add('hidden');
         }
     });
-    
-    // --- Định nghĩa animation shake (nếu chưa có) --- 
+
+    // --- Định nghĩa animation shake (giữ nguyên) --- 
     let shakeKeyframesDefined = false;
     for (const sheet of document.styleSheets) {
         try {
@@ -107,7 +196,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.head.appendChild(styleSheet);
     }
 
-    // Cập nhật năm bản quyền (moved from inline script)
+    // Cập nhật năm bản quyền (giữ nguyên)
     const copyrightYearElement = document.getElementById('copyrightYear');
     if (copyrightYearElement) {
         copyrightYearElement.textContent = new Date().getFullYear();

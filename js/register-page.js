@@ -10,20 +10,50 @@ document.addEventListener('DOMContentLoaded', () => {
     const buttonText = submitButton ? submitButton.querySelector('.button-text') : null;
     const buttonSpinner = submitButton ? submitButton.querySelector('.button-spinner') : null;
 
-    // Check for necessary elements
-    if (!registerForm || !fullNameInput || !emailInput || !passwordInput || !confirmPasswordInput || !errorMessageDiv || !errorTextElement || !submitButton || !buttonText || !buttonSpinner) {
-        console.error("Register page UI elements not found. Initialization failed.");
+    // Lấy các phần tử modal
+    const successModal = document.getElementById('successModal');
+    const modalContent = successModal ? successModal.querySelector('.modal-content') : null;
+    const modalOkButton = document.getElementById('modalOkButton');
+
+    // Check for necessary elements (bao gồm cả modal)
+    if (!registerForm || !fullNameInput || !emailInput || !passwordInput || !confirmPasswordInput || !errorMessageDiv || !errorTextElement || !submitButton || !buttonText || !buttonSpinner || !successModal || !modalContent || !modalOkButton) {
+        console.error("Register page UI elements (including modal) not found. Initialization failed.");
         return;
     }
 
-    // Đảm bảo hàm handleRegister đã được tải từ js/register.js
+    // Đảm bảo hàm handleRegister đã được tải
     if (typeof handleRegister !== 'function') {
-        console.error("Lỗi nghiêm trọng: Hàm handleRegister() không tìm thấy. Đảm bảo js/register.js đã được tải trước js/register-page.js.");
+        console.error("Lỗi nghiêm trọng: Hàm handleRegister() không tìm thấy.");
         errorTextElement.textContent = 'Lỗi tải trang. Vui lòng thử lại.';
         errorMessageDiv.style.display = 'flex';
         submitButton.disabled = true;
         return;
     }
+
+    // Hàm hiển thị modal
+    function showSuccessModal() {
+        if (!successModal || !modalContent) return;
+        successModal.classList.remove('hidden');
+        // Trigger reflow để animation hoạt động
+        void successModal.offsetWidth;
+        modalContent.classList.remove('scale-95', 'opacity-0');
+        modalContent.classList.add('scale-100', 'opacity-100');
+    }
+
+    // Hàm ẩn modal (không cần thiết nếu chỉ chuyển trang)
+    // function hideSuccessModal() {
+    //     if (!successModal || !modalContent) return;
+    //     modalContent.classList.remove('scale-100', 'opacity-100');
+    //     modalContent.classList.add('scale-95', 'opacity-0');
+    //     setTimeout(() => {
+    //         successModal.classList.add('hidden');
+    //     }, 300); // Thời gian khớp với transition
+    // }
+
+    // Gắn sự kiện cho nút OK trên modal
+    modalOkButton.addEventListener('click', () => {
+        window.location.href = 'login.html'; // Chuyển hướng đến trang đăng nhập
+    });
 
     registerForm.addEventListener('submit', async function(event) {
         event.preventDefault();
@@ -77,8 +107,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const registrationResult = await handleRegister(fullName, email, password, confirmPassword);
 
             if (registrationResult.success) {
-                 alert('Đăng ký thành công! Bạn sẽ được chuyển đến trang đăng nhập.');
-                 window.location.href = 'login.html';
+                 // Thay vì alert, hiển thị modal
+                 showSuccessModal();
+                 // Không cần reset nút vì modal sẽ che form và sau đó chuyển trang
             } else {
                 // Registration failed
                 errorTextElement.textContent = registrationResult.message || 'Đăng ký không thành công. Vui lòng thử lại.';

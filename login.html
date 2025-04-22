@@ -8,6 +8,8 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="tailwind.config.js"></script>
+    <!-- Tải thư viện Google Identity Services -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
     <style>
         /* Thêm keyframes cho animation fade-in */
         @keyframes fadeIn {
@@ -76,6 +78,17 @@
                 </button>
             </div>
         </form>
+
+        <div class="relative my-6 h-px bg-secondary-200">
+            <div class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 transform bg-white px-2">
+              <span class="text-sm font-medium text-secondary-500">Hoặc đăng nhập với</span>
+            </div>
+          </div>
+
+          <div>
+            <!-- Thay thế button bằng div để Google render nút -->
+            <div id="googleSignInButtonDiv" class="flex justify-center"></div>
+          </div>
 
         <p class="mt-8 text-center text-sm text-secondary-500">
             Chưa có tài khoản? <a href="register.html" class="font-medium text-primary-600 hover:text-primary-700 hover:underline">Đăng ký ngay</a>

@@ -97,6 +97,7 @@ function getUserInfo() {
     }
     return null;
 }
+
 /**
  * Hàm kiểm tra xác thực tổng quát, gọi checkLoginStatus mới.
  * @returns {boolean} True nếu đã xác thực, false nếu chưa.
@@ -140,5 +141,63 @@ function displayUserInfo() {
 // Hàm xử lý đăng xuất (giữ nguyên để gắn vào nút)
 function handleUserLogout() {
     handleLogout();
+}
+
+/**
+ * Gửi yêu cầu đăng nhập bằng Google đến API backend.
+ * Hàm này CẦN được tích hợp với thư viện Google Sign-In thực tế.
+ * Nó sẽ nhận ID Token từ Google và gửi đến backend để xác thực.
+ * @param {string} googleIdToken ID Token nhận được từ Google sau khi người dùng đăng nhập.
+ * @returns {Promise<{success: boolean, message?: string}>}
+ */
+async function handleGoogleLogin(googleIdToken) {
+    // *** QUAN TRỌNG: Cần thay thế bằng endpoint API Google Login của bạn ***
+    const apiUrl = 'http://172.20.10.44:8055/api/Users/google-login'; 
+
+    // *** QUAN TRỌNG: Đây là ví dụ, cấu trúc body cần khớp với yêu cầu của API backend ***
+    const requestBody = {
+        idToken: googleIdToken 
+    };
+
+    console.log('Sending Google ID Token to backend:', requestBody); // Log để debug
+
+    try {
+        const response = await fetch(apiUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(requestBody)
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            // Giống như login thường, lưu thông tin trả về từ API
+            try {
+                localStorage.setItem('apiUserInfo', JSON.stringify(data)); // Lưu data từ API
+                console.log('API Google Login Success:', 'Data:', data);
+                return { success: true };
+            } catch (storageError) {
+                console.error('Lỗi khi lưu thông tin đăng nhập Google vào localStorage:', storageError);
+                return { success: true, message: 'Đăng nhập thành công nhưng lỗi lưu phiên.' };
+            }
+        } else {
+            // Xử lý lỗi từ API Google Login
+            let errorMessage = `Lỗi ${response.status}: ${response.statusText || 'Không thể đăng nhập bằng Google'}`;
+            try {
+                const errorData = await response.json();
+                errorMessage = errorData.message || errorData.error || errorMessage;
+            } catch (parseError) {
+                 console.warn('Could not parse error JSON from API Google login', parseError);
+            }
+            console.error('API Google Login Error:', errorMessage);
+            localStorage.removeItem('apiUserInfo'); // Xóa nếu lỗi
+            return { success: false, message: errorMessage };
+        }
+    } catch (error) {
+        console.error('Network or fetch error during Google login:', error);
+        localStorage.removeItem('apiUserInfo'); // Xóa nếu lỗi mạng
+        return { success: false, message: 'Lỗi kết nối mạng hoặc không thể gửi yêu cầu đăng nhập Google.' };
+    }
 }
 
