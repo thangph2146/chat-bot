@@ -162,72 +162,6 @@ function isLocalStorageAvailable() {
     }
 }
 
-// Xử lý khi không có localStorage 
-function handleNoLocalStorage() {
-    // Tạo một đối tượng giả lập localStorage trong bộ nhớ
-    const memoryStorage = {};
-
-    // Ghi đè phương thức localStorage
-    const oldLocalStorage = window.localStorage;
-    window.localStorage = {
-        getItem: function (key) {
-            return memoryStorage[key] || null;
-        },
-        setItem: function (key, value) {
-            memoryStorage[key] = String(value);
-        },
-        removeItem: function (key) {
-            delete memoryStorage[key];
-        },
-        clear: function () {
-            Object.keys(memoryStorage).forEach(key => {
-                delete memoryStorage[key];
-            });
-        }
-    };
-
-    console.warn('Đang sử dụng bộ nhớ tạm thay vì localStorage. Dữ liệu sẽ bị mất khi tải lại trang.');
-    showNotification('Trình duyệt không hỗ trợ lưu trữ cục bộ. Dữ liệu sẽ bị mất khi tải lại trang.', 'warning');
-
-    // Khôi phục localStorage ban đầu khi trang được tải lại
-    window.addEventListener('beforeunload', function () {
-        window.localStorage = oldLocalStorage;
-    });
-}
-
-// Hàm khôi phục dữ liệu nếu có vấn đề với localStorage
-function recoverChatSessions() {
-    try {
-        // Thử lấy dữ liệu từ sessionStorage nếu có
-        const sessionBackup = sessionStorage.getItem('chatSessionsBackup');
-        if (sessionBackup && sessionBackup !== 'undefined' && sessionBackup !== 'null') {
-            const parsedData = JSON.parse(sessionBackup);
-            if (Array.isArray(parsedData) && parsedData.length > 0) {
-                chatSessions = parsedData;
-                saveChatSessions(); // Lưu lại vào localStorage
-                console.log('Đã khôi phục dữ liệu từ sessionStorage');
-                return true;
-            }
-        }
-
-        return false;
-    } catch (e) {
-        console.error('Lỗi khi khôi phục dữ liệu:', e);
-        return false;
-    }
-}
-
-// Tạo backup trong sessionStorage
-function backupChatSessions() {
-    try {
-        if (Array.isArray(chatSessions) && chatSessions.length > 0) {
-            sessionStorage.setItem('chatSessionsBackup', JSON.stringify(chatSessions));
-        }
-    } catch (e) {
-        console.error('Không thể tạo backup:', e);
-    }
-}
-
 // Tải phiên chat từ API
 async function loadChatSessions() {
     const apiUrl = SESSIONS_API_ENDPOINT;
@@ -290,7 +224,8 @@ async function loadChatSessions() {
     }
 }
 
-// Lưu phiên chat vào localStorage (CACHE/FALLBACK)
+// Lưu phiên chat vào localStorage (CACHE/FALLBACK) - KHÔNG CẦN NỮA
+/*
 function saveChatSessions() {
     try {
         // Chỉ lưu các trường cần thiết cho cache/UI state
@@ -309,9 +244,8 @@ function saveChatSessions() {
         console.error("Lỗi khi lưu cache session:", e);
         // Không cần thông báo lỗi này cho người dùng
     }
-    // Backup vào sessionStorage không còn cần thiết nếu không có logic khôi phục phức tạp
-    // backupChatSessions();
 }
+*/
 
 // Cập nhật sidebar lịch sử chat
 function updateHistorySidebar() {
@@ -356,7 +290,7 @@ function updateHistorySidebar() {
                 <div class="truncate text-sm font-medium text-secondary-800" title="${title}">${title}</div>
                 <div class="text-xs text-secondary-500">${dateStr || 'Không có ngày'}</div>
             </div>
-            <button class="delete-session-btn absolute right-2 top-1/2 z-10 -translate-y-1/2 p-1 text-secondary-400 opacity-0 transition-opacity group-hover:opacity-100 hover:text-red-500" data-session-id="${session.id}" title="Xóa cuộc trò chuyện">
+            <button class="delete-session-btn ml-auto flex-shrink-0 p-1 text-secondary-400 opacity-0 transition-opacity group-hover:opacity-100 hover:text-red-500" data-session-id="${session.id}" title="Xóa cuộc trò chuyện">
                 <svg xmlns="http://www.w3.org/2000/svg" class="pointer-events-none h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"> <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /> </svg>
             </button>
         `;
@@ -476,8 +410,8 @@ async function loadSessionMessages(sessionId) {
         targetSession.lastUpdatedAt = sessionData.lastUpdatedAt || targetSession.lastUpdatedAt;
         targetSession.conversationId = sessionData.conversationId || targetSession.conversationId || null;
 
-        // Lưu cache session mới cập nhật (chỉ thông tin session, không phải messages)
-        saveChatSessions();
+        // Lưu cache session mới cập nhật (chỉ thông tin session, không phải messages) - KHÔNG CẦN NỮA
+        // saveChatSessions();
         // Cập nhật lại sidebar nếu title hoặc lastUpdatedAt thay đổi
         updateHistorySidebar();
 
@@ -617,7 +551,7 @@ function clearChatHistory() {
         // Xóa dữ liệu client-side
         chatSessions = [];
         currentSessionId = null;
-        localStorage.removeItem('chatSessionsCache'); // Sử dụng đúng key
+        // localStorage.removeItem('chatSessionsCache'); // Sử dụng đúng key - KHÔNG CẦN NỮA
         chatContainer.innerHTML = '';
         updateHistorySidebar();
 
@@ -785,19 +719,20 @@ function clearChatHistory() {
 //     return notification;
 // }
 
-// Đảm bảo dữ liệu được lưu khi rời trang
+// Đảm bảo dữ liệu được lưu khi rời trang - KHÔNG CẦN NỮA
+/*
 window.addEventListener('beforeunload', function () {
     // Lưu dữ liệu hiện tại vào localStorage cache
     if (Array.isArray(chatSessions) && chatSessions.length > 0) {
         try {
             // localStorage.setItem('chatSessions', JSON.stringify(chatSessions)); // Key cũ
-            saveChatSessions(); // Gọi hàm save chuẩn
-            // sessionStorage.setItem('chatSessionsBackup', JSON.stringify(chatSessions)); // Không cần backup session nữa
+            // saveChatSessions(); // Gọi hàm save chuẩn
         } catch (e) {
             console.error('Không thể lưu dữ liệu trước khi rời trang:', e);
         }
     }
 });
+*/
 
 // Định dạng thời gian (tối ưu: trả về giờ:phút hiện tại, hoặc lấy từ timestamp nếu có)
 function formatTime(date) {
@@ -1278,13 +1213,24 @@ async function showWelcomeMessage() {
 
     // Lấy thông tin user để gửi kèm yêu cầu
     const userInfo = getUserInfo();
-    if (!userInfo || !userInfo.token || !userInfo.userId) {
+    // === LOẠI BỎ LOGGING DEBUG ===
+    // console.log('[DEBUG] userInfo in showWelcomeMessage:', JSON.stringify(userInfo));
+    // try {
+    //     const storedData = localStorage.getItem('hub_user_data');
+    //     console.log('[DEBUG] localStorage hub_user_data:', storedData);
+    // } catch (e) {
+    //     console.error('[DEBUG] Error reading localStorage:', e);
+    // }
+    // === KẾT THÚC LOGGING ===
+
+    // Kiểm tra thông tin user
+    if (!userInfo || !userInfo.data || !userInfo.data.userId || !userInfo.data.token) {
         console.error("Lỗi: Không tìm thấy thông tin User hợp lệ (ID hoặc Token) để lấy welcome message.");
         addMessageToChat("Chào bạn! Tôi là Trợ lý Tuyển sinh HUB. (Lỗi tải lời chào)", false, false);
         return;
     }
-    const userToken = userInfo.token;
-    const userId = userInfo.userId;
+    // Lấy token trực tiếp từ userInfo.data
+    const userToken = userInfo.data.token;
 
     // Tạo placeholder cho tin nhắn welcome
     const welcomeMessageContentElement = addMessageToChat(null, false, false, 'welcome-message-placeholder', null, true);
@@ -1293,11 +1239,16 @@ async function showWelcomeMessage() {
     const apiUrl = CHAT_API_ENDPOINT;
     const requestBody = {
         inputs: {},
-        query: '###__get_welcome_message__###', // Query đặc biệt
+        query: 'Bắt đầu cuộc trò chuyện', // Query đặc biệt
         response_mode: 'streaming',
-        user: String(userId),
-        conversation_id: null // Welcome message không thuộc về conversation nào trước đó
+        // Sử dụng trực tiếp userInfo.data.userId và đảm bảo là string
+        user: String(userInfo.data.userId),
+        // Gửi currentSessionId thay vì null
+        conversation_id: currentSessionId
     };
+
+    // Log lại request body để kiểm tra
+    console.log('Sending welcome message request:', requestBody);
 
     try {
         // Gọi hàm xử lý SSE stream mới cho welcome message
@@ -1392,26 +1343,38 @@ document.addEventListener('DOMContentLoaded', async () => { // <<< Đánh dấu 
  * @param {string} sessionId - ID của phiên chat cần xóa
  */
 async function deleteSession(sessionId) {
-    // Hiển thị hộp thoại xác nhận
+    // Tìm session để lấy title
+    const sessionToDelete = chatSessions.find(s => s.id === sessionId);
+    const sessionTitle = sessionToDelete?.title || "Cuộc trò chuyện này"; // Fallback title
+
+    // Hiển thị hộp thoại xác nhận tùy chỉnh
     const confirmDialog = document.createElement('div');
     confirmDialog.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+    confirmDialog.id = 'confirmDialog'; // ID để dễ dàng xóa
+
     confirmDialog.innerHTML = `
-        <div class="bg-[#343541] rounded-lg p-6 max-w-md w-full mx-4">
-            <h3 class="text-xl font-semibold text-white mb-4">Xác nhận xóa</h3>
-            <p class="text-gray-300 mb-6">Bạn có chắc muốn xóa cuộc trò chuyện này không?</p>
+        <div class="bg-white rounded-xl p-6 max-w-md w-full mx-4 shadow-xl">
+            <h3 class="text-xl font-bold text-red-600 mb-4">Xác nhận xóa</h3>
+            <p class="text-secondary-700 mb-6">Bạn có chắc chắn muốn xóa <strong class="font-semibold">${sessionTitle}</strong> không? Hành động này không thể hoàn tác.</p>
             <div class="flex justify-end gap-3">
-                <button id="cancel-delete" class="px-4 py-2 rounded-md bg-gray-600 text-white hover:bg-gray-700 transition-colors">Hủy</button>
-                <button id="confirm-delete" class="px-4 py-2 rounded-md bg-red-600 text-white hover:bg-red-700 transition-colors">Xóa</button>
+                <button id="cancel-delete" class="px-4 py-2 rounded-lg bg-secondary-200 text-secondary-800 hover:bg-secondary-300 transition-colors">Hủy</button>
+                <button id="confirm-delete" class="px-4 py-2 rounded-lg bg-red-500 text-white hover:bg-red-600 transition-colors">Xóa</button>
             </div>
         </div>
     `;
 
     document.body.appendChild(confirmDialog);
 
+    // Hàm đóng dialog
+    const closeDialog = () => {
+        const dialog = document.getElementById('confirmDialog');
+        if (dialog && document.body.contains(dialog)) {
+            document.body.removeChild(dialog);
+        }
+    };
+
     // Xử lý sự kiện nút
-    document.getElementById('cancel-delete').addEventListener('click', () => {
-        document.body.removeChild(confirmDialog);
-    });
+    document.getElementById('cancel-delete').addEventListener('click', closeDialog);
 
     document.getElementById('confirm-delete').addEventListener('click', async () => {
         // Sửa endpoint API
@@ -1423,17 +1386,16 @@ async function deleteSession(sessionId) {
         // Kiểm tra userInfo và userInfo.data trước khi truy cập token
         if (!userInfo || !userInfo.data || !userInfo.data.token) {
             showNotification('Lỗi xác thực hoặc không tìm thấy token. Không thể xóa phiên chat.', 'error');
-            // Đóng dialog nếu còn
-            const dialog = document.getElementById('confirmDialog');
-            if(dialog) document.body.removeChild(dialog);
+            closeDialog();
             return;
         }
         const userToken = userInfo.data.token; // Lấy token từ data
 
-        // Hiển thị loading
+        // Hiển thị loading trên nút xác nhận
         const confirmButton = document.getElementById('confirm-delete');
         confirmButton.textContent = 'Đang xóa...';
         confirmButton.disabled = true;
+        document.getElementById('cancel-delete').disabled = true; // Vô hiệu hóa cả nút hủy
 
         try {
             const response = await fetch(apiUrl, {
@@ -1447,26 +1409,44 @@ async function deleteSession(sessionId) {
             if (response.ok) {
                 console.log(`Session ${sessionId} deleted successfully via API.`);
                 showNotification('Đã xóa phiên chat thành công.', 'success');
-                await loadChatSessions();
+                // Xóa khỏi mảng chatSessions ở client ngay lập tức
+                chatSessions = chatSessions.filter(session => session.id !== sessionId);
+                // Nếu session bị xóa là session hiện tại, chọn session khác hoặc tạo mới
+                if (currentSessionId === sessionId) {
+                    currentSessionId = null;
+                    chatContainer.innerHTML = ''; // Xóa nội dung chat
+                    if (chatSessions.length > 0) {
+                         // Sắp xếp lại để lấy session mới nhất
+                         chatSessions.sort((a, b) => new Date(b.lastUpdatedAt).getTime() - new Date(a.lastUpdatedAt).getTime());
+                        await loadSessionMessages(chatSessions[0].id); // Load session đầu tiên
+                    } else {
+                        await startNewChat(); // Tạo chat mới nếu không còn session nào
+                    }
+                } else {
+                    updateHistorySidebar(); // Chỉ cập nhật sidebar nếu không phải session hiện tại
+                }
+                // Xóa dòng này: saveChatSessions(); // Cập nhật cache
+
             } else {
                 const errorText = await response.text();
                 console.error(`API error deleting session ${sessionId}: ${response.status}`, errorText);
                 showNotification(`Lỗi xóa phiên chat: ${response.statusText || 'Lỗi không xác định'}`, 'error');
+                // Khôi phục lại nút nếu lỗi
                 confirmButton.textContent = 'Xóa';
                 confirmButton.disabled = false;
+                document.getElementById('cancel-delete').disabled = false;
             }
         } catch (error) {
             // Lỗi mạng hoặc lỗi fetch
             console.error(`Network error deleting session ${sessionId}:`, error);
             showNotification('Lỗi mạng khi xóa phiên chat. Vui lòng thử lại.', 'error');
+            // Khôi phục lại nút nếu lỗi
             confirmButton.textContent = 'Xóa';
             confirmButton.disabled = false;
+            document.getElementById('cancel-delete').disabled = false;
         } finally {
-            // Đóng hộp thoại (chỉ đóng nếu còn tồn tại)
-            const dialog = document.getElementById('confirmDialog');
-            if(dialog && document.body.contains(dialog)) {
-                 document.body.removeChild(dialog);
-            }
+            // Đóng hộp thoại sau khi xử lý xong (thành công hoặc thất bại)
+            closeDialog();
         }
     });
 }
