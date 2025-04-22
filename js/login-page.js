@@ -5,72 +5,79 @@ document.addEventListener('DOMContentLoaded', () => {
     const emailInput = document.getElementById('email');
     const passwordInput = document.getElementById('password');
     const errorMessageDiv = document.getElementById('errorMessage');
-    const submitButton = loginForm ? loginForm.querySelector('button[type="submit"]') : null;
-    const originalButtonText = submitButton ? submitButton.textContent : 'Đăng nhập';
+    const errorTextElement = document.getElementById('errorText'); // Get the span for error text
+    const submitButton = document.getElementById('loginSubmitButton'); // Use specific ID
+    const buttonText = submitButton ? submitButton.querySelector('.button-text') : null;
+    const buttonSpinner = submitButton ? submitButton.querySelector('.button-spinner') : null;
+
+    // Check for necessary elements
+    if (!loginForm || !emailInput || !passwordInput || !errorMessageDiv || !errorTextElement || !submitButton || !buttonText || !buttonSpinner) {
+        console.error("Login page UI elements not found. Initialization failed.");
+        return;
+    }
 
     // Đảm bảo hàm handleLogin đã được tải từ js/login.js
     if (typeof handleLogin !== 'function') {
         console.error("Lỗi nghiêm trọng: Hàm handleLogin() không tìm thấy. Đảm bảo js/login.js đã được tải trước js/login-page.js.");
-        if(errorMessageDiv) {
-            errorMessageDiv.textContent = 'Lỗi tải trang. Vui lòng thử lại.';
-            errorMessageDiv.style.display = 'block';
+        errorTextElement.textContent = 'Lỗi tải trang. Vui lòng thử lại.';
+        errorMessageDiv.style.display = 'flex'; // Show error container
+        submitButton.disabled = true;
+        return;
+    }
+
+    loginForm.addEventListener('submit', async function(event) {
+        event.preventDefault();
+
+        const email = emailInput.value.trim().toLowerCase();
+        const password = passwordInput.value.trim();
+
+        errorMessageDiv.style.display = 'none';
+        errorTextElement.textContent = '';
+
+        if (!email || !password) {
+            errorTextElement.textContent = 'Vui lòng nhập email và mật khẩu.';
+            errorMessageDiv.style.display = 'flex'; // Show error container
+            return;
         }
-        if(submitButton) submitButton.disabled = true;
-        return; // Dừng lại nếu hàm cốt lõi bị thiếu
-    }
 
-    if (loginForm && submitButton) {
-        loginForm.addEventListener('submit', async function(event) {
-            event.preventDefault();
+        // --- Xử lý trạng thái chờ --- 
+        submitButton.disabled = true;
+        buttonText.textContent = 'Đang xử lý...'; // Change text
+        buttonSpinner.classList.remove('hidden'); // Show spinner
 
-            const email = emailInput.value.trim().toLowerCase();
-            const password = passwordInput.value.trim();
+        // --- Gọi hàm handleLogin (API) --- 
+        try {
+            const loginResult = await handleLogin(email, password); // Call async handleLogin from login.js
 
-            errorMessageDiv.style.display = 'none';
-            errorMessageDiv.textContent = '';
-
-            if (!email || !password) {
-                errorMessageDiv.textContent = 'Vui lòng nhập email và mật khẩu.';
-                errorMessageDiv.style.display = 'block';
-                return;
-            }
-
-            // --- Xử lý trạng thái chờ --- 
-            submitButton.disabled = true;
-            submitButton.innerHTML = `
-                <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                Đang đăng nhập...
-            `;
-
-            // --- Gọi hàm handleLogin (API) --- 
-            try {
-                const loginResult = await handleLogin(email, password); // Call async handleLogin from login.js
-
-                if (loginResult.success) {
-                    errorMessageDiv.style.display = 'none';
-                    window.location.href = 'index.html';
-                } else {
-                    errorMessageDiv.textContent = loginResult.message || 'Email hoặc mật khẩu không đúng.';
-                    errorMessageDiv.style.display = 'block';
-                    passwordInput.value = '';
-                    emailInput.focus();
-                    loginForm.classList.add('animate-shake');
-                    setTimeout(() => loginForm.classList.remove('animate-shake'), 500);
-                    submitButton.disabled = false;
-                    submitButton.textContent = originalButtonText;
-                }
-            } catch (error) {
-                console.error("Unexpected error during login form submission:", error);
-                errorMessageDiv.textContent = 'Đã xảy ra lỗi không mong muốn. Vui lòng thử lại.';
-                errorMessageDiv.style.display = 'block';
+            if (loginResult.success) {
+                errorMessageDiv.style.display = 'none';
+                // Optional: Show a success message briefly before redirecting
+                buttonText.textContent = 'Thành công!';
+                window.location.href = 'index.html';
+            } else {
+                // Login failed
+                errorTextElement.textContent = loginResult.message || 'Email hoặc mật khẩu không đúng.';
+                errorMessageDiv.style.display = 'flex'; // Show error container
+                passwordInput.value = '';
+                emailInput.focus();
+                loginForm.classList.add('animate-shake');
+                setTimeout(() => loginForm.classList.remove('animate-shake'), 500);
+                // Reset button state
                 submitButton.disabled = false;
-                submitButton.textContent = originalButtonText;
+                buttonText.textContent = 'Đăng nhập'; // Restore original text
+                buttonSpinner.classList.add('hidden'); // Hide spinner
             }
-        });
-    }
+        } catch (error) {
+            // Unexpected error
+            console.error("Unexpected error during login form submission:", error);
+            errorTextElement.textContent = 'Đã xảy ra lỗi không mong muốn. Vui lòng thử lại.';
+            errorMessageDiv.style.display = 'flex'; // Show error container
+            // Reset button state
+            submitButton.disabled = false;
+            buttonText.textContent = 'Đăng nhập'; // Restore original text
+            buttonSpinner.classList.add('hidden'); // Hide spinner
+        }
+    });
     
     // --- Định nghĩa animation shake (nếu chưa có) --- 
     let shakeKeyframesDefined = false;
@@ -98,5 +105,11 @@ document.addEventListener('DOMContentLoaded', () => {
         .animate-shake { animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both; }
         `;
         document.head.appendChild(styleSheet);
+    }
+
+    // Cập nhật năm bản quyền (moved from inline script)
+    const copyrightYearElement = document.getElementById('copyrightYear');
+    if (copyrightYearElement) {
+        copyrightYearElement.textContent = new Date().getFullYear();
     }
 }); 

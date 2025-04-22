@@ -97,7 +97,6 @@ function getUserInfo() {
     }
     return null;
 }
-
 /**
  * Hàm kiểm tra xác thực tổng quát, gọi checkLoginStatus mới.
  * @returns {boolean} True nếu đã xác thực, false nếu chưa.
@@ -142,3 +141,4 @@ function displayUserInfo() {
 function handleUserLogout() {
     handleLogout();
 }
+
