@@ -861,14 +861,9 @@ function addCopyButton(preElement) {
 // Thêm tin nhắn vào chat (tối ưu: truyền timestamp, render markdown cho bot)
 // Sửa đổi: Thêm isStreaming flag, trả về contentDiv để cập nhật stream.
 function addMessageToChat(message, isUser = false, save = true, customId = null, timestamp = null, isStreaming = false) {
-    hideStaticWelcomeMessage();
+    // hideStaticWelcomeMessage(); // <<< Gọi ở đầu hàm là đủ
     // Bỏ qua nếu không có message và không phải streaming placeholder
     if (!message && !customId && !isStreaming) return;
-
-    const welcomeElement = document.getElementById('welcomeMessage');
-    if (welcomeElement && !welcomeElement.classList.contains('hidden')) {
-        welcomeElement.classList.add('hidden');
-    }
 
     const messageDiv = document.createElement('div');
     if (customId) messageDiv.id = customId;
@@ -929,7 +924,7 @@ function addMessageToChat(message, isUser = false, save = true, customId = null,
                 isUser,
                 timestamp: now.toISOString()
             });
-            saveChatSessions();
+            // saveChatSessions(); // <<< XÓA - Hàm này đã bị comment out
         }
     }
 
@@ -1141,7 +1136,6 @@ async function handleSendMessage() {
         currentSession.title = newTitle;
         // currentSession.name = newTitle; // Assume name is not used/needed if title exists
         updateHistorySidebar();
-        saveChatSessions();
         // await updateSessionTitleOnServer(currentSessionId, newTitle); // Cần API cập nhật title
     }
 
@@ -1179,7 +1173,7 @@ async function handleSendMessage() {
                      });
                      currentSession.conversationId = result.conversationId; // Cập nhật ID cuối cùng
                      currentSession.lastUpdatedAt = new Date().toISOString(); // Update last updated time
-                     saveChatSessions(); // Lưu lại session
+                     // saveChatSessions(); // <<< XÓA - Lưu lại session qua localStorage không cần thiết
                      updateHistorySidebar(); // Cập nhật sidebar để phản ánh thời gian mới
                      console.log('AI message saved to session:', { messageId: result.messageId, conversationId: result.conversationId });
                  } else {
@@ -1189,7 +1183,7 @@ async function handleSendMessage() {
              (error) => {
                  // onError callback (optional, error already shown in placeholder)
                  console.error('SSE stream failed in handleSendMessage:', error);
-                 // showNotification(`Lỗi khi nhận phản hồi: ${error.message}`, 'error'); // Không cần thiết vì lỗi đã hiển thị
+                 // showNotification(`Lỗi khi nhận phản hồi: ${error.message}`, 'error'); // Không cần thiết
              }
          );
 
