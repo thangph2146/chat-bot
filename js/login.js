@@ -90,7 +90,7 @@ function getUserInfo() {
     try {
         const userInfoString = localStorage.getItem('apiUserInfo'); // Lấy key mới
         if (userInfoString) {
-            return JSON.parse(userInfoString).data;
+            return JSON.parse(userInfoString);
         }
     } catch (e) {
         console.error('Lỗi khi lấy thông tin người dùng API:', e);

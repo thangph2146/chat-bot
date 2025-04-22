@@ -63,52 +63,70 @@ async function sendChatMessage(message, conversationId = null) {
     }
 }
 
-// Ví dụ cách gọi hàm này từ giao diện chat của bạn (đặt trong file JS chính của trang chat):
-/*
-const chatInput = document.getElementById('chatInput');
-const sendButton = document.getElementById('sendButton');
-const chatMessagesDiv = document.getElementById('chatMessages');
-let currentConversationId = null; // Lưu ID cuộc trò chuyện hiện tại
+/**
+ * Lưu một tin nhắn (người dùng hoặc bot) vào session thông qua API.
+ * @param {string} sessionId ID của session chat.
+ * @param {number} userId ID của người dùng.
+ * @param {string} content Nội dung tin nhắn.
+ * @param {boolean} isUser True nếu là tin nhắn người dùng, false nếu là bot.
+ * @returns {Promise<boolean>} True nếu lưu thành công, false nếu có lỗi.
+ */
+async function saveMessageToSession(sessionId, userId, content, isUser) {
+    const saveApiUrl = 'http://172.20.10.44:8055/api/ChatMessages';
+    const userInfo = getUserInfo(); // Lấy thông tin user (để lấy token)
 
-// Lấy ID cuộc trò chuyện ban đầu (nếu có) sau khi callChatAPI trong login.js chạy
-// Ví dụ: currentConversationId = sessionStorage.getItem('currentConversationId');
-
-sendButton.addEventListener('click', async () => {
-    const message = chatInput.value.trim();
-    if (!message) return;
-
-    // Hiển thị tin nhắn người dùng (ví dụ)
-    appendMessage('user', message);
-    chatInput.value = '';
-    chatInput.disabled = true;
-    sendButton.disabled = true;
-
-    const responseData = await sendChatMessage(message, currentConversationId);
-
-    chatInput.disabled = false;
-    sendButton.disabled = false;
-
-    if (responseData && responseData.response) {
-        // Hiển thị tin nhắn của bot (ví dụ)
-        appendMessage('bot', responseData.response);
-
-        // Cập nhật conversationId nếu API trả về ID mới hoặc hiện tại
-        if (responseData.conversation_id) {
-            currentConversationId = responseData.conversation_id;
-            // Lưu lại nếu cần: sessionStorage.setItem('currentConversationId', currentConversationId);
-             console.log("Updated Conversation ID:", currentConversationId);
-        }
-    } else {
-        // Xử lý lỗi hiển thị (ví dụ)
-        appendMessage('system', 'Lỗi: Không thể gửi tin nhắn.');
+    if (!userInfo || !userInfo.token) {
+        console.error('Lỗi: Không tìm thấy token xác thực để lưu tin nhắn.');
+        showNotification('Lỗi xác thực, không thể lưu tin nhắn.', 'error');
+        return false;
     }
-});
 
-function appendMessage(sender, text) {
-    const messageElement = document.createElement('div');
-    messageElement.classList.add('message', sender === 'user' ? 'user-message' : 'bot-message');
-    messageElement.textContent = text;
-    chatMessagesDiv.appendChild(messageElement);
-    chatMessagesDiv.scrollTop = chatMessagesDiv.scrollHeight; // Cuộn xuống dưới
+    if (!sessionId) {
+         console.error('Lỗi: Không có sessionId để lưu tin nhắn.');
+         // Không nên hiển thị lỗi này cho người dùng cuối, log là đủ
+         return false;
+    }
+
+    const requestBody = {
+        sessionId: sessionId,
+        userId: userId,       // Đảm bảo userId là number
+        isUser: isUser,
+        content: content
+    };
+
+    console.log(`Saving message to session ${sessionId}:`, JSON.stringify(requestBody));
+
+    try {
+        const response = await fetch(saveApiUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${userInfo.token}`
+            },
+            body: JSON.stringify(requestBody)
+        });
+
+        if (response.ok) {
+            // Có thể không cần xử lý data trả về nếu API chỉ trả về status
+            console.log(`Message (${isUser ? 'user' : 'bot'}) saved successfully for session ${sessionId}.`);
+            return true;
+        } else {
+            // Xử lý lỗi từ API
+            let errorMessage = `Lỗi lưu tin nhắn vào session: ${response.status}`;
+            try {
+                const errorData = await response.json();
+                errorMessage = errorData.message || errorData.error || errorMessage;
+            } catch (parseError) {
+                console.warn('Không thể phân tích lỗi JSON từ API lưu tin nhắn:', parseError);
+                 errorMessage = await response.text(); // Log raw text nếu JSON parse lỗi
+            }
+            console.error(errorMessage);
+            showNotification('Không thể lưu tin nhắn vào lịch sử.', 'error');
+            return false;
+        }
+    } catch (error) {
+        console.error('Lỗi mạng hoặc fetch khi lưu tin nhắn:', error);
+        showNotification('Lỗi mạng, không thể lưu tin nhắn.', 'error');
+        return false;
+    }
 }
-*/ 
