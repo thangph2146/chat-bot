@@ -370,7 +370,7 @@ function updateHistorySidebar() {
         emptyState.className = 'text-center py-8 text-secondary-500 text-sm';
         emptyState.innerHTML = `
             <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto mb-2 text-secondary-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03 8 9 8s9-3.582 9-8z" />
             </svg>
             <p>Chưa có phiên chat nào</p>
             <p class="mt-2">Bấm "Bắt đầu chat mới" để bắt đầu</p>
@@ -445,7 +445,7 @@ function loadSession(sessionId) {
     
     if (session) {
         session.messages.forEach(msg => {
-            addMessageToChat(msg.message, msg.isUser, false);
+            addMessageToChat(msg.message, msg.isUser, false, null, msg.timestamp);
         });
         chatContainer.scrollTop = chatContainer.scrollHeight;
     }
@@ -453,7 +453,7 @@ function loadSession(sessionId) {
     updateHistorySidebar();
 }
 
-// Bắt đầu phiên chat mới
+// Sửa startNewChat gọi showWelcomeMessage dạng async
 function startNewChat() {
     const newSessionId = generateId();
     const sessionName = `Chat ${chatSessions.length + 1}`;
@@ -469,9 +469,6 @@ function startNewChat() {
     
     // Cập nhật ID phiên hiện tại
     currentSessionId = newSessionId;
-    
-    // Xóa nội dung chat hiện tại
-    chatContainer.innerHTML = '';
     
     // Lưu vào localStorage
     saveChatSessions();
@@ -713,105 +710,68 @@ window.addEventListener('beforeunload', function() {
     }
 });
 
-// Định dạng thời gian
+// Định dạng thời gian (tối ưu: trả về giờ:phút hiện tại, hoặc lấy từ timestamp nếu có)
 function formatTime(date) {
-    if (typeof date === 'string') {
-        date = new Date(date);
-    }
+    if (!date) return '';
+    if (typeof date === 'string') date = new Date(date);
+    if (!(date instanceof Date) || isNaN(date)) return '';
     const hours = date.getHours().toString().padStart(2, '0');
     const minutes = date.getMinutes().toString().padStart(2, '0');
     return `${hours}:${minutes}`;
 }
 
-// Thêm tin nhắn vào chat
-function addMessageToChat(message, isUser = false, save = true, customId = null) {
+// Xóa welcome message cứng trong HTML nếu có (ẩn hoặc xóa khi đã có tin nhắn từ dify)
+function hideStaticWelcomeMessage() {
+    const welcomeElement = document.getElementById('welcomeMessage');
+    if (welcomeElement) {
+        welcomeElement.classList.add('hidden');
+    }
+}
+
+// Thêm tin nhắn vào chat (tối ưu: truyền timestamp, render markdown cho bot)
+function addMessageToChat(message, isUser = false, save = true, customId = null, timestamp = null) {
+    hideStaticWelcomeMessage();
     if (!message && !customId) return;
-    
-    // Ẩn tin nhắn chào mừng nếu đang hiển thị
     const welcomeElement = document.getElementById('welcomeMessage');
     if (welcomeElement && !welcomeElement.classList.contains('hidden')) {
         welcomeElement.classList.add('hidden');
     }
-    
     const messageDiv = document.createElement('div');
-    
-    // Thêm ID nếu được chỉ định (cho streaming)
-    if (customId) {
-        messageDiv.id = customId;
-    }
-    
-    // Khởi tạo timestamp
-    const now = new Date();
-    const timestamp = formatTime(now);
-    
+    if (customId) messageDiv.id = customId;
+    const now = timestamp ? new Date(timestamp) : new Date();
+    const timeStr = formatTime(now);
     if (isUser) {
-        // Tin nhắn người dùng - bên phải
         messageDiv.className = 'flex flex-col items-end space-y-1 animate-fade-in mb-4';
-        
-        // Thời gian
         const timeDiv = document.createElement('div');
         timeDiv.className = 'text-xs text-secondary-500 mr-2';
-        timeDiv.textContent = timestamp;
+        timeDiv.textContent = timeStr;
         messageDiv.appendChild(timeDiv);
-
-        // Nội dung tin nhắn
         const contentDiv = document.createElement('div');
         contentDiv.className = 'bg-primary-600 text-white px-4 py-2 rounded-t-2xl rounded-bl-2xl max-w-[85%] shadow-sm';
         contentDiv.textContent = message;
         messageDiv.appendChild(contentDiv);
     } else {
-        // Tin nhắn bot - bên trái
         messageDiv.className = 'flex flex-col space-y-1 animate-fade-in mb-4';
-        
-        // Thời gian
         const timeDiv = document.createElement('div');
         timeDiv.className = 'text-xs text-secondary-500 ml-2';
-        timeDiv.textContent = timestamp;
+        timeDiv.textContent = timeStr;
         messageDiv.appendChild(timeDiv);
-
-        // Nội dung tin nhắn
         const messageRow = document.createElement('div');
         messageRow.className = 'flex items-start';
-        
         const contentDiv = document.createElement('div');
-        contentDiv.className = 'bg-secondary-100 text-secondary-800 px-4 py-2 rounded-t-2xl rounded-br-2xl max-w-[85%] shadow-sm';
-        
-        // Lưu trữ nội dung tin nhắn để cập nhật khi streaming
+        contentDiv.className = 'bg-secondary-100 text-secondary-800 px-4 py-2 rounded-t-2xl rounded-br-2xl max-w-[85%] shadow-sm message-content';
+        // Nếu là message bot đã lưu, render markdown
         if (message) {
-            contentDiv.textContent = message;
-        } else {
-            // Đây là placeholder cho bot
-            if(customId) {
-                 // Thêm cấu trúc cho hiệu ứng ellipsis và nội dung markdown
-                 contentDiv.innerHTML = `
-                    <div class="ellipsis-animation">
-                        <span>.</span><span>.</span><span>.</span>
-                    </div>
-                    <div class="markdown-content" style="display: none;"></div>
-                 `;
-            }
-            contentDiv.className += ' message-content min-h-[24px] min-w-[60px]';
+            contentDiv.innerHTML = renderMarkdown(message);
+            setTimeout(() => highlightCodeBlocks(contentDiv), 10);
+        } else if (customId) {
+            contentDiv.innerHTML = `<div class="ellipsis-animation"><span>.</span><span>.</span><span>.</span></div><div class="markdown-content" style="display: none;"></div>`;
         }
-        
         messageRow.appendChild(contentDiv);
         messageDiv.appendChild(messageRow);
     }
-    
-    // Render markdown và highlight code cho tin nhắn bot đã lưu
-    if (!isUser && !save && message) {
-        const contentDiv = messageDiv.querySelector('.message-content, div[class^="bg-secondary-100"]'); // Tìm đúng content div
-        if (contentDiv) {
-            contentDiv.innerHTML = renderMarkdown(message);
-            highlightCodeBlocks(contentDiv);
-        } else {
-            console.warn("Không tìm thấy content div để render markdown cho tin nhắn đã lưu:", messageDiv);
-        }
-    }
-    
     chatContainer.appendChild(messageDiv);
     chatContainer.scrollTop = chatContainer.scrollHeight;
-    
-    // Lưu tin nhắn vào lịch sử nếu cần
     if (save && currentSessionId) {
         const session = chatSessions.find(s => s.id === currentSessionId);
         if (session) {
@@ -823,7 +783,6 @@ function addMessageToChat(message, isUser = false, save = true, customId = null)
             saveChatSessions();
         }
     }
-    
     return messageDiv;
 }
 
@@ -868,6 +827,7 @@ async function callChatbotAPI(message, conversationId = '') {
         const decoder = new TextDecoder();
         let accumulatedResponse = '';
         let conversationIdFromStream = '';
+        let firstBotMessage = '';
         
         // Tìm message element để cập nhật nội dung
         if (!messageElement) {
@@ -927,6 +887,9 @@ async function callChatbotAPI(message, conversationId = '') {
                         if (data.event === 'message') {
                             // Cập nhật tin nhắn streaming
                             accumulatedResponse += data.answer || '';
+                            if (!firstBotMessage && data.answer) {
+                                firstBotMessage = data.answer;
+                            }
                             
                             // Render nội dung markdown, xóa "..." nếu là chunk đầu tiên
                             if (isFirstChunk) {
@@ -993,7 +956,8 @@ async function callChatbotAPI(message, conversationId = '') {
         
         return {
             answer: accumulatedResponse,
-            conversationId: conversationIdFromStream
+            conversationId: conversationIdFromStream,
+            firstBotMessage
         };
     } catch (error) {
         // hideTypingIndicator(); // Ẩn hiệu ứng đang gõ khi có lỗi
@@ -1030,116 +994,32 @@ async function callChatbotAPI(message, conversationId = '') {
  */
 function renderMarkdown(text) {
     if (!text) return '';
-
-    // --- Block Elements ---
-
-    // 1. Code blocks (```...```) - Xử lý trước tiên để tránh xung đột
-    let html = text.replace(/```([\w-]*)\n([\s\S]*?)\n```/g, function(match, language, code) {
-        language = language.trim();
-        const languageClass = language ? ` language-${language}` : '';
-        // Escape HTML characters inside code blocks
-        const escapedCode = code.replace(/</g, '&lt;').replace(/>/g, '&gt;');
-        return `<pre><code class="hljs${languageClass}">${escapedCode}</code></pre>`;
-    });
-
-    // 2. Tables (Kiểm tra sự tồn tại của '|' trước)
-    if (html.includes('|')) {
-        html = html.replace(/^\|(.+)\|\n\|([\s\-:]+[-:|\s]*)\|\n((\|.+\|\n?)+)/gm, function(match, headerRow, separatorRow, bodyRows) {
-            const headers = headerRow.split('|').map(h => h.trim()).filter(Boolean);
-            let tableHtml = '<div class="overflow-x-auto my-4"><table class="w-full border-collapse">\n<thead>\n<tr>';
-            headers.forEach(header => {
-                tableHtml += `<th class="border border-secondary-300 bg-secondary-100 px-4 py-2 text-left">${header}</th>`;
-            });
-            tableHtml += '</tr>\n</thead>\n<tbody>';
-
-            const rows = bodyRows.trim().split('\n');
-            rows.forEach(row => {
-                const cells = row.split('|').map(c => c.trim()).filter(Boolean);
-                // Make sure cells match header count, though markdown is often forgiving
-                if (cells.length > 0) {
-                    tableHtml += '\n<tr>';
-                    cells.forEach(cell => {
-                        // Recursively render markdown inside cells if needed (basic inline for now)
-                        const cellContent = cell
-                            .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-                            .replace(/\*(.+?)\*/g, '<em>$1</em>')
-                            .replace(/`(.+?)`/g, '<code class="inline-code bg-secondary-100 text-secondary-800 px-1 rounded font-mono">$1</code>');
-                        tableHtml += `<td class="border border-secondary-300 px-4 py-2">${cellContent}</td>`;
-                    });
-                    tableHtml += '</tr>';
-                }
-            });
-            tableHtml += '\n</tbody>\n</table></div>';
-            return tableHtml;
-        });
-    }
-
-    // 3. Blockquotes (> ...)
-    html = html.replace(/^> (.*$)/gm, '<blockquote class="pl-4 border-l-4 border-primary-500 italic my-4 text-secondary-600">$1</blockquote>');
-
-    // 4. Horizontal Rules (---, ===)
-    html = html.replace(/^\s*(?:-{3,}|={3,})\s*$/gm, '<hr class="my-4 border-t border-secondary-300">');
-
-    // 5. Headers (#, ##, ###) - Kết hợp bằng capturing group
-    html = html.replace(/^(\#{1,3})\s+(.*)$/gm, function(match, hashes, content) {
-        const level = hashes.length;
-        const tag = `h${level}`;
-        const classes = {
-            1: 'text-2xl font-bold my-4',
-            2: 'text-xl font-bold my-3',
-            3: 'text-lg font-bold my-2'
-        };
-        return `<${tag} class="${classes[level]}">${content}</${tag}>`;
-    });
-
-    // 6. Lists (ul, ol) - Xử lý từng dòng và nhóm lại sau
-    html = html.replace(/^([*\-])\s+(.*)$/gm, '<li class="ml-4 list-disc">$2</li>'); // Unordered
-    html = html.replace(/^(\d+)\.\s+(.*)$/gm, '<li class="ml-4 list-decimal" value="$1">$2</li>'); // Ordered
-
-    // Đơn giản hóa việc nhóm list: Wrap consecutive li of the same type
-    html = html.replace(/(?:<li class="ml-4 list-disc">.*?<\/li>\s*)+/g, (match) => {
-        return `<ul class="my-2">${match.replace(/<\/li>\s*<li/g, '</li><li')}</ul>`;
-    });
-    html = html.replace(/(?:<li class="ml-4 list-decimal".*?>.*?<\/li>\s*)+/g, (match) => {
-        return `<ol class="my-2">${match.replace(/<\/li>\s*<li/g, '</li><li')}</ol>`;
-    });
-
-
-    // --- Inline Elements & Paragraphs ---
-
-    // 7. Paragraphs and Line Breaks
-    // Chia thành các đoạn dựa trên dòng trống, xử lý markdown trong từng đoạn
-    html = html.split(/\n\n+/).map(paragraph => {
-        if (!paragraph.trim()) return ''; // Bỏ qua đoạn trống
-
-        // Bỏ qua nếu đoạn đã là thẻ block (list, table, pre, blockquote, hr, h)
-        if (/^\s*<(ul|ol|li|pre|table|blockquote|hr|h[1-6])/i.test(paragraph.trim())) {
-            return paragraph;
-        }
-
-        // Xử lý inline markdown trong đoạn
-        let processedParagraph = paragraph
-            // Links
-            .replace(/\[([^\]]+?)\]\(([^)]+?)\)/g, '<a href="$2" target="_blank" class="text-primary-600 hover:underline">$1</a>')
-            // Bold
-            .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-            // Italic
-            .replace(/\*(.+?)\*/g, '<em>$1</em>')
-            // Inline Code
-            .replace(/`(.+?)`/g, '<code class="inline-code bg-secondary-100 text-secondary-800 px-1 rounded font-mono">$1</code>')
-             // Convert single newlines within a paragraph to <br>
-            .replace(/\n/g, '<br>');
-
-        // Wrap in <p> tag if it's not already part of a block element handled above
-        return `<p class="my-2">${processedParagraph}</p>`;
-
-    }).join('');
-
-    // Dọn dẹp <br> thừa ở đầu/cuối các block
-    html = html.replace(/<p class="my-2">\s*<br>\s*<\/p>/g, ''); // Xóa p chỉ chứa br
-    html = html.replace(/(<\/(?:ul|ol|pre|blockquote|table|h[1-6])>)\s*<br>\s*/gi, '$1');
-    html = html.replace(/<br>\s*(<(?:ul|ol|pre|table|blockquote|hr|h[1-6]))/gi, '$1');
-
+    let html = text
+        // Code block
+        .replace(/```([\w-]*)\n([\s\S]*?)\n```/g, (m, lang, code) => `<pre><code class="hljs language-${lang.trim()}">${code.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</code></pre>`)
+        // Inline code
+        .replace(/`([^`]+?)`/g, '<code class="inline-code bg-secondary-100 text-secondary-800 px-1 rounded font-mono">$1</code>')
+        // Bold
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+        // Italic
+        .replace(/\*(.+?)\*/g, '<em>$1</em>')
+        // Link
+        .replace(/\[([^\]]+?)\]\(([^)]+?)\)/g, '<a href="$2" target="_blank" class="text-primary-600 hover:underline">$1</a>')
+        // Blockquote
+        .replace(/^> (.*)$/gm, '<blockquote class="pl-4 border-l-4 border-primary-500 italic my-4 text-secondary-600">$1</blockquote>')
+        // Header
+        .replace(/^### (.*)$/gm, '<h3 class="text-lg font-bold my-2">$1</h3>')
+        .replace(/^## (.*)$/gm, '<h2 class="text-xl font-bold my-3">$1</h2>')
+        .replace(/^# (.*)$/gm, '<h1 class="text-2xl font-bold my-4">$1</h1>')
+        // Unordered list
+        .replace(/^\s*[-*] (.*)$/gm, '<ul class="my-2"><li class="ml-4 list-disc">$1</li></ul>')
+        // Ordered list
+        .replace(/^\s*\d+\. (.*)$/gm, '<ol class="my-2"><li class="ml-4 list-decimal">$1</li></ol>')
+        // Paragraph
+        .replace(/\n{2,}/g, '</p><p class="my-2">')
+        .replace(/^(?!<h\d|<ul|<ol|<blockquote|<pre|<p)(.+)$/gm, '<p class="my-2">$1</p>');
+    // Dọn dẹp thẻ p lồng nhau
+    html = html.replace(/<p class="my-2">\s*<\/p>/g, '');
     return html;
 }
 
@@ -1237,18 +1117,46 @@ async function handleSendMessage() {
     }
 }
 
-// Hiển thị tin nhắn chào mừng
-function showWelcomeMessage() {
-    setTimeout(() => {
-        const welcomeMessage = "Xin chào! Tôi là Trợ lý AI của Đại học Ngân hàng TP.HCM. Tôi có thể giúp bạn trả lời các câu hỏi về tuyển sinh, chương trình đào tạo, học phí, và các thông tin khác về trường. Bạn cần hỗ trợ gì?";
-        addMessageToChat(welcomeMessage, false);
-        
-        // Thêm class welcome-message để có animation riêng
+// Hiển thị tin nhắn chào mừng từ dify (không hard code, chỉ 1 tin nhắn duy nhất, không lưu vào session)
+async function showWelcomeMessage() {
+    chatContainer.innerHTML = '';
+    hideStaticWelcomeMessage();
+    // Gọi API lấy chào mừng, KHÔNG lưu vào chatSessions/messages
+    const { firstBotMessage } = await callChatbotAPI('###__get_welcome_message__###', '');
+    if (firstBotMessage) {
+        // Hiển thị chào mừng nhưng không lưu vào session.messages
+        addMessageToChat(firstBotMessage, false, false);
         const lastMessage = chatContainer.lastElementChild;
-        if (lastMessage) {
-            lastMessage.classList.add('welcome-message');
-        }
-    }, 500);
+        if (lastMessage) lastMessage.classList.add('welcome-message');
+    }
+}
+
+// Lấy danh sách lịch sử chat từ API Directus
+async function fetchChatSessionsFromAPI() {
+    try {
+        const response = await fetch('http://172.20.10.44:8055/api/ChatSessions');
+        if (!response.ok) throw new Error('Lỗi khi lấy lịch sử chat từ API');
+        const data = await response.json();
+        // data có thể là { data: [...] } hoặc mảng trực tiếp
+        return Array.isArray(data) ? data : (data.data || []);
+    } catch (err) {
+        console.error('Không thể lấy lịch sử chat từ API:', err);
+        return [];
+    }
+}
+
+// Gọi API và cập nhật sidebar lịch sử chat khi load trang
+async function updateHistorySidebarFromAPI() {
+    const apiSessions = await fetchChatSessionsFromAPI();
+    if (Array.isArray(apiSessions) && apiSessions.length > 0) {
+        historySessions.innerHTML = '';
+        apiSessions.forEach(session => {
+            const sessionItem = document.createElement('div');
+            sessionItem.className = 'p-3 rounded-lg cursor-pointer text-sm truncate flex justify-between items-center mb-2 transition-all hover:shadow-hover bg-secondary-100 text-secondary-700 hover:bg-secondary-200';
+            sessionItem.innerHTML = `<div class='flex-grow truncate'><div class='font-medium truncate'>${session.Title || 'Chat không tên'}</div><div class='text-xs text-secondary-500 truncate mt-1'>${session.CreatedAt ? new Date(session.CreatedAt).toLocaleString('vi-VN') : ''}</div></div>`;
+            historySessions.appendChild(sessionItem);
+        });
+    }
 }
 
 // Event Listeners
@@ -1264,22 +1172,6 @@ newChatButton.addEventListener('click', startNewChat);
 clearHistoryButton.addEventListener('click', clearChatHistory);
 
 recordButton.addEventListener('click', toggleRecording);
-
-/**
- * Khởi tạo chatbot
- */
-function initChatbot() {
-    const chatContainer = document.getElementById('chatContainer');
-    const messageInput = document.getElementById('messageInput');
-    const sendButton = document.getElementById('sendButton');
-    const loadingIndicator = document.getElementById('loadingIndicator');
-    const clearHistoryButton = document.getElementById('clearHistoryButton');
-    const newChatButton = document.getElementById('newChatButton');
-    const historySessions = document.getElementById('historySessions');
-    const recordButton = document.getElementById('recordButton');
-
-    // ... rest of original script.js code ...
-}
 
 // Initial Load
 document.addEventListener('DOMContentLoaded', () => {
@@ -1315,6 +1207,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (newChatButtonSidebar) {
         newChatButtonSidebar.addEventListener('click', startNewChat);
     }
+    updateHistorySidebarFromAPI(); // Lấy lịch sử chat từ API khi load trang
 });
 
 /**
