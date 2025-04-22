@@ -39,6 +39,7 @@ async function handleLogin(email, password) {
             try {
                 localStorage.setItem('apiUserInfo', JSON.stringify(data)); // Lưu data từ API
                 console.log('API Login Success:', email, 'Data:', data);
+                callChatAPI(); // Gọi API chat sau khi đăng nhập thành công
                 return { success: true };
             } catch (storageError) {
                 console.error('Lỗi khi lưu thông tin đăng nhập vào localStorage:', storageError);
@@ -89,7 +90,7 @@ function getUserInfo() {
     try {
         const userInfoString = localStorage.getItem('apiUserInfo'); // Lấy key mới
         if (userInfoString) {
-            return JSON.parse(userInfoString);
+            return JSON.parse(userInfoString).data;
         }
     } catch (e) {
         console.error('Lỗi khi lấy thông tin người dùng API:', e);
@@ -176,6 +177,7 @@ async function handleGoogleLogin(googleIdToken) {
             try {
                 localStorage.setItem('apiUserInfo', JSON.stringify(data)); // Lưu data từ API
                 console.log('API Google Login Success:', 'Data:', data);
+                callChatAPI(); // Gọi API chat sau khi đăng nhập Google thành công
                 return { success: true };
             } catch (storageError) {
                 console.error('Lỗi khi lưu thông tin đăng nhập Google vào localStorage:', storageError);
@@ -198,6 +200,63 @@ async function handleGoogleLogin(googleIdToken) {
         console.error('Network or fetch error during Google login:', error);
         localStorage.removeItem('apiUserInfo'); // Xóa nếu lỗi mạng
         return { success: false, message: 'Lỗi kết nối mạng hoặc không thể gửi yêu cầu đăng nhập Google.' };
+    }
+}
+
+/**
+ * Gửi yêu cầu đến API chat sau khi đăng nhập thành công.
+ */
+async function callChatAPI() {
+    const chatApiUrl = 'http://172.20.10.44:8055/api/ChatMessages/v1/chat';
+    const userInfo = getUserInfo(); // Lấy thông tin user (ví dụ: token, id)
+
+    // Kiểm tra xem có userInfo và các trường cần thiết (token, id) không
+    if (!userInfo || !userInfo.token || userInfo.id === undefined) {
+        console.warn('Không tìm thấy thông tin xác thực đầy đủ (token, id) để gọi API chat.');
+        // Quyết định xem có nên dừng lại hay thử gọi mà không có user id
+        // Hiện tại đang dừng lại:
+        return;
+    }
+
+    const requestBody = {
+        query: "", // Chuỗi rỗng để bắt đầu chat mới
+        conversation_id: null, // null để tạo cuộc trò chuyện mới
+        response_mode: "sync", // Theo ví dụ bạn cung cấp
+        inputs: {}, // Theo ví dụ bạn cung cấp
+        user: userInfo.id // Gửi ID người dùng
+    };
+
+    console.log('Gọi API Chat để bắt đầu cuộc trò chuyện mới. Body:', JSON.stringify(requestBody));
+
+    try {
+        const response = await fetch(chatApiUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${userInfo.token}` // Gửi token
+            },
+            body: JSON.stringify(requestBody) // Gửi body đã cấu trúc
+        });
+
+        if (response.ok) {
+            const chatData = await response.json();
+            console.log('Gọi API Chat (bắt đầu mới) thành công:', chatData);
+            // Có thể lưu conversation_id mới trả về nếu cần:
+            // if (chatData.conversation_id) {
+            //    sessionStorage.setItem('currentConversationId', chatData.conversation_id);
+            // }
+        } else {
+            let chatErrorMsg = `Lỗi gọi API Chat (bắt đầu mới): ${response.status}`;
+            try {
+                const errorData = await response.json();
+                chatErrorMsg = errorData.message || errorData.error || chatErrorMsg;
+            } catch (e) { /* Bỏ qua lỗi parse JSON nếu có */ }
+            console.error(chatErrorMsg);
+            // Có thể thông báo lỗi cho người dùng nếu cần
+        }
+    } catch (error) {
+        console.error('Lỗi mạng khi gọi API Chat (bắt đầu mới):', error);
+        // Có thể thông báo lỗi cho người dùng nếu cần
     }
 }
 

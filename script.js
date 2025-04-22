@@ -230,87 +230,67 @@ function backupChatSessions() {
     }
 }
 
-// Tải phiên chat từ localStorage
-function loadChatSessions() {
-    // Kiểm tra localStorage có hoạt động không
-    if (!isLocalStorageAvailable()) {
-        handleNoLocalStorage();
-    }
-    
+// Tải phiên chat từ API
+async function loadChatSessions() { // <<< Đánh dấu là async
+    const apiUrl = 'http://172.20.10.44:8055/api/ChatSessions';
+    console.log(`Fetching history from ${apiUrl}...`);
+    chatSessions = []; // Reset trước khi tải
+    currentSessionId = null;
+    historySessions.innerHTML = '<p class="text-center text-secondary-500 text-sm p-4">Đang tải lịch sử...</p>'; // Hiển thị loading
+
     try {
-        const storedSessions = localStorage.getItem('chatSessions');
-        // console.log('Dữ liệu đã lưu trong localStorage:', storedSessions);
-        
-        if (storedSessions && storedSessions !== 'undefined' && storedSessions !== 'null') {
-            chatSessions = JSON.parse(storedSessions);
-            
-            // Kiểm tra xem có đúng định dạng mảng không
-            if (!Array.isArray(chatSessions)) {
-                console.error("Dữ liệu không đúng định dạng mảng:", chatSessions);
-                
-                // Thử khôi phục từ backup
-                if (!recoverChatSessions()) {
-                    chatSessions = [];
-                    startNewChat();
-                    return;
-                }
+        const response = await fetch(apiUrl);
+        // Không cần kiểm tra response.ok nữa nếu API luôn trả về 200 và có status riêng
+        const data = await response.json();
+        console.log('History data received:', data);
+
+        // Kiểm tra status và sự tồn tại của mảng sessions từ response
+        if (data && data.status === 'success' && Array.isArray(data.sessions)) {
+            if (data.sessions.length === 0) {
+                // API trả về thành công nhưng không có session nào
+                historySessions.innerHTML = `<p class="text-center text-secondary-500 text-sm p-4">${data.message || 'Chưa có lịch sử trò chuyện.'}</p>`;
+                // Không có session cũ, bắt đầu chat mới
+                startNewChat(); // Gọi startNewChat để tạo session mới qua API
+                return; // Kết thúc hàm ở đây
             }
-            
-            // console.log('Đã tải được', chatSessions.length, 'phiên chat');
-            
-            if (chatSessions.length > 0) {
-                // Tạo backup ngay sau khi tải thành công
-                backupChatSessions();
-                
-                // Lấy phiên chat mới nhất
-                currentSessionId = chatSessions[chatSessions.length - 1].id;
-                
-                // Hiển thị danh sách phiên chat
-                updateHistorySidebar();
-                
-                // Hiển thị tin nhắn của phiên hiện tại
-                const currentSession = chatSessions.find(s => s.id === currentSessionId);
-                if (currentSession && Array.isArray(currentSession.messages)) {
-                    currentSession.messages.forEach(msg => {
-                        addMessageToChat(msg.message, msg.isUser, false);
-                    });
-                    
-                    // Cuộn xuống cuối cùng
-                    setTimeout(() => {
-                        chatContainer.scrollTop = chatContainer.scrollHeight;
-                    }, 100);
-                } else {
-                    console.warn("Không tìm thấy tin nhắn trong phiên chat hiện tại");
-                }
-            } else {
-                console.log("Không có phiên chat nào, bắt đầu phiên mới");
-                startNewChat();
-            }
+
+            // Có sessions, xử lý định dạng lại
+            const formattedSessions = data.sessions.map((item, index) => ({
+                id: item.id || item.sessionId || generateUniqueId(),
+                title: item.title || item.summary || `Cuộc trò chuyện #${index + 1}`,
+                messages: item.messages || [], // Giả định API có thể trả về messages hoặc không
+                timestamp: item.timestamp || item.createdAt || item.updatedAt || Date.now(),
+                conversationId: item.conversationId || ''
+            }));
+
+            chatSessions = formattedSessions;
+
+            // Sắp xếp và chọn session mới nhất làm session hiện tại
+            chatSessions.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+            currentSessionId = chatSessions[0].id;
+
+            // Cập nhật sidebar trước khi tải messages
+            updateHistorySidebar();
+
+            // Tải tin nhắn cho session mới nhất
+            await loadSessionMessages(currentSessionId);
+
         } else {
-            console.log("Không tìm thấy dữ liệu phiên chat trong localStorage");
-            // Thử khôi phục từ backup
-            if (!recoverChatSessions()) {
-                startNewChat();
-            } else {
-                // Tải lại dữ liệu đã khôi phục
-                loadChatSessions();
-            }
+            // API không trả về status success hoặc sessions không phải mảng
+            console.error('Invalid data format from API:', data);
+            throw new Error('Dữ liệu lịch sử trả về không hợp lệ.');
         }
-    } catch (e) {
-        console.error("Lỗi khi tải phiên chat:", e);
-        
-        // Thử khôi phục từ backup
-        if (!recoverChatSessions()) {
-            // Khởi tạo lại dữ liệu mới nếu có lỗi
-            chatSessions = [];
-            localStorage.removeItem('chatSessions');
-            startNewChat();
-            showNotification('Đã xảy ra lỗi khi tải lịch sử chat, đã tạo phiên mới', 'warning');
-        } else {
-            // Tải lại dữ liệu đã khôi phục
-            loadChatSessions();
-        }
+
+    } catch (error) {
+        console.error('Lỗi khi tải lịch sử chat từ API:', error);
+        showNotification('Không thể tải lịch sử chat từ máy chủ.', 'error');
+        historySessions.innerHTML = '<p class="text-center text-red-500 text-sm p-4">Lỗi tải lịch sử.</p>';
+        chatSessions = []; // Đảm bảo mảng rỗng khi lỗi
+        currentSessionId = null;
+        // Có thể hiển thị nút thử lại hoặc bắt đầu chat mới
+         startNewChat(); // Hoặc không làm gì cả tùy vào UX mong muốn
     }
+    // Không cần gọi updateHistorySidebar() ở finally nữa
 }
 
 // Lưu phiên chat vào localStorage
@@ -363,121 +343,298 @@ function saveChatSessions() {
 
 // Cập nhật sidebar lịch sử chat
 function updateHistorySidebar() {
+    // Xóa nội dung cũ trước khi thêm mới
     historySessions.innerHTML = '';
-    
+
+    // Kiểm tra lại nếu mảng chatSessions rỗng sau khi các thao tác (ví dụ: lỗi API)
     if (chatSessions.length === 0) {
-        const emptyState = document.createElement('div');
-        emptyState.className = 'text-center py-8 text-secondary-500 text-sm';
-        emptyState.innerHTML = `
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto mb-2 text-secondary-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03 8 9 8s9-3.582 9-8z" />
-            </svg>
-            <p>Chưa có phiên chat nào</p>
-            <p class="mt-2">Bấm "Bắt đầu chat mới" để bắt đầu</p>
-        `;
-        historySessions.appendChild(emptyState);
+        // Không cần hiển thị gì ở đây nữa vì loadChatSessions đã xử lý trường hợp rỗng ban đầu
+        // Hoặc bạn có thể thêm lại thông báo nếu muốn nó xuất hiện cả khi xóa hết session
+        // historySessions.innerHTML = '<p class="text-center text-secondary-500 text-sm p-4">Chưa có lịch sử trò chuyện.</p>';
         return;
     }
-    
-    // Sắp xếp phiên chat mới nhất lên đầu
-    const sortedSessions = [...chatSessions].reverse();
-    
+
+    // Sắp xếp các phiên theo thời gian mới nhất trước (đã sắp xếp trong loadChatSessions, nhưng để đây cho chắc)
+    const sortedSessions = [...chatSessions].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+
     sortedSessions.forEach(session => {
-        const sessionItem = document.createElement('div');
-        sessionItem.id = `session-${session.id}`;
-        sessionItem.className = `p-3 rounded-lg cursor-pointer text-sm truncate flex justify-between items-center mb-2 transition-all hover:shadow-hover ${
-            session.id === currentSessionId 
-                ? 'bg-primary-100 text-primary-700 border-l-4 border-primary-500' 
-                : 'bg-secondary-100 text-secondary-700 hover:bg-secondary-200'
-        }`;
-        
-        // Tạo nội dung phiên chat
-        const sessionContent = document.createElement('div');
-        sessionContent.className = 'flex-grow truncate';
-        
-        const sessionName = document.createElement('div');
-        sessionName.className = 'font-medium truncate';
-        sessionName.textContent = session.name;
-        sessionContent.appendChild(sessionName);
-        
-        // Hiển thị tin nhắn cuối cùng
-        if (session.messages && session.messages.length > 0) {
-            const lastMessage = document.createElement('div');
-            lastMessage.className = 'text-xs text-secondary-500 truncate mt-1';
-            const lastMsg = session.messages[session.messages.length - 1];
-            lastMessage.textContent = `${lastMsg.isUser ? 'Bạn: ' : 'Bot: '}${lastMsg.message.substring(0, 30)}${lastMsg.message.length > 30 ? '...' : ''}`;
-            sessionContent.appendChild(lastMessage);
+        const historyItem = document.createElement('div');
+        historyItem.className = 'history-item flex items-center p-3 bg-secondary-50 hover:bg-secondary-100 rounded-lg transition-all cursor-pointer relative group';
+        historyItem.dataset.sessionId = session.id; // Lưu ID vào data attribute
+
+        // Highlight session hiện tại
+        if (session.id === currentSessionId) {
+            historyItem.classList.add('active', 'bg-primary-100');
+            historyItem.style.borderLeft = '4px solid var(--color-primary-600, #b42c1c)';
+            historyItem.style.paddingLeft = 'calc(0.75rem - 4px)'; // Điều chỉnh padding
+        } else {
+             historyItem.style.borderLeft = '4px solid transparent';
+             historyItem.style.paddingLeft = '0.75rem';
         }
-        
-        sessionItem.appendChild(sessionContent);
-        
-        // Nút xóa phiên chat
-        const deleteButton = document.createElement('button');
-        deleteButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-        </svg>`;
-        deleteButton.className = 'ml-2 bg-red-500 text-white rounded-full text-xs w-5 h-5 flex items-center justify-center hover:bg-red-600 hover:scale-110 transition-all';
-        deleteButton.title = 'Xóa phiên chat này';
-        deleteButton.onclick = (event) => {
-            event.stopPropagation();
-            deleteSession(session.id);
-        };
-        sessionItem.appendChild(deleteButton);
-        
-        // Sự kiện click để chọn phiên chat
-        sessionItem.onclick = (event) => {
-            if (event.target !== deleteButton && !deleteButton.contains(event.target)) {
-                loadSession(session.id);
+
+        const dateStr = session.timestamp ? new Date(session.timestamp).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year:'numeric' }) : '';
+        const title = session.title || `Cuộc trò chuyện #${session.id.substring(0, 5)}`;
+
+        historyItem.innerHTML = `
+            <div class="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center mr-3 flex-shrink-0">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                </svg>
+            </div>
+            <div class="flex-grow overflow-hidden">
+                <div class="text-sm font-medium text-secondary-800 truncate" title="${title}">${title}</div>
+                <div class="text-xs text-secondary-500">${dateStr}</div>
+            </div>
+            <button class="delete-session-btn absolute right-2 top-1/2 transform -translate-y-1/2 p-1 text-secondary-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity z-10" data-session-id="${session.id}" title="Xóa cuộc trò chuyện">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor"> <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /> </svg>
+            </button>
+        `;
+
+        historyItem.addEventListener('click', async (e) => { // <<< Đánh dấu là async
+            // Không load session nếu click vào nút xóa
+            if (e.target.closest('.delete-session-btn')) {
+                return;
             }
-        };
-        
-        historySessions.appendChild(sessionItem);
+            const clickedSessionId = historyItem.dataset.sessionId;
+            if (clickedSessionId !== currentSessionId) {
+                 console.log(`Loading session: ${clickedSessionId}`);
+                 // Tải messages cho session được click
+                 await loadSessionMessages(clickedSessionId); // <<< Gọi hàm tải message
+                 // loadSessionUI(clickedSessionId); // Không gọi UI trực tiếp nữa
+            }
+            // Đóng sidebar trên mobile khi chọn session
+            if (window.innerWidth < 768) {
+                const closeButton = document.getElementById('closeHistorySidebar');
+                if (closeButton) closeButton.click();
+            }
+        });
+
+        // Thêm event listener cho nút xóa
+        const deleteButton = historyItem.querySelector('.delete-session-btn');
+        if (deleteButton) {
+            deleteButton.addEventListener('click', (e) => {
+                e.stopPropagation(); // Ngăn sự kiện click của item cha
+                const sessionIdToDelete = e.currentTarget.dataset.sessionId;
+                console.log(`Requesting delete for session: ${sessionIdToDelete}`);
+                // Nên có xác nhận trước khi xóa?
+                 deleteSession(sessionIdToDelete); // Cần đảm bảo hàm này gọi API xóa
+            });
+        }
+
+        historySessions.appendChild(historyItem);
     });
 }
 
-// Tải một phiên chat cụ thể
-function loadSession(sessionId) {
-    if (sessionId === currentSessionId) return;
-    
-    currentSessionId = sessionId;
-    chatContainer.innerHTML = '';
+// Tải một phiên chat cụ thể (CHỈ TÌM TRONG MẢNG HIỆN TẠI)
+// Hàm này KHÔNG fetch messages từ API
+function loadSessionUI(sessionId) {
     const session = chatSessions.find(s => s.id === sessionId);
-    
-    if (session) {
+    chatContainer.innerHTML = ''; // Xóa tin nhắn cũ
+
+    if (session && session.messages && session.messages.length > 0) {
+         hideStaticWelcomeMessage();
         session.messages.forEach(msg => {
             addMessageToChat(msg.message, msg.isUser, false, null, msg.timestamp);
         });
-        chatContainer.scrollTop = chatContainer.scrollHeight;
+         // Cuộn xuống cuối
+         setTimeout(() => {
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }, 100);
+    } else if (session) {
+        // Session tồn tại nhưng không có messages (cần fetch) hoặc là session mới
+         // Có thể hiển thị loading hoặc welcome message tùy logic
+         console.log(`Session ${sessionId} loaded, but no messages locally. Fetching or showing welcome.`);
+         // Nếu là session mới hoàn toàn, showWelcomeMessage() sẽ được gọi sau đó
+         // Nếu là session cũ chưa fetch messages, loadSessionMessages sẽ xử lý
+         if (session.messages && session.messages.length === 0 && chatSessions.length > 1) {
+            // Có thể là session cũ không có tin nhắn, hiển thị welcome tùy chỉnh?
+             showWelcomeMessage(); // Hoặc một thông báo khác
+         } else if (!session.messages) {
+             // Trường hợp messages là undefined hoặc null - đợi fetch
+             chatContainer.innerHTML = '<p class="text-center text-secondary-500 p-4">Đang tải tin nhắn...</p>';
+         } else {
+              showWelcomeMessage(); // Mặc định hiển thị welcome nếu không có tin nhắn
+         }
+
+    } else {
+        console.warn(`Không tìm thấy session với ID: ${sessionId} trong mảng chatSessions.`);
+        // Có thể tạo session mới hoặc hiển thị lỗi
+        startNewChat();
     }
     
-    updateHistorySidebar();
+    // Chỉ cập nhật currentSessionId và sidebar sau khi UI được cập nhật
+    currentSessionId = sessionId;
+    updateHistorySidebar(); // Để highlight đúng session
 }
 
-// Sửa startNewChat gọi showWelcomeMessage dạng async
-function startNewChat() {
-    const newSessionId = generateId();
-    const sessionName = `Chat ${chatSessions.length + 1}`;
-    
-    // Thêm phiên chat mới vào mảng
-    chatSessions.push({
-        id: newSessionId,
-        name: sessionName,
-        messages: [],
-        createdAt: new Date().toISOString(),
-        conversationId: ''
-    });
-    
-    // Cập nhật ID phiên hiện tại
-    currentSessionId = newSessionId;
-    
-    // Lưu vào localStorage
-    saveChatSessions();
-    
-    // Cập nhật sidebar
+// Hàm MỚI để tải messages cho một session cụ thể từ API
+async function loadSessionMessages(sessionId) {
+    const session = chatSessions.find(s => s.id === sessionId);
+    // Nếu session đã có messages rồi thì không cần fetch lại (trừ khi muốn refresh)
+    // if (session && session.messages && session.messages.length > 0) {
+    //     console.log(`Messages for session ${sessionId} already loaded.`);
+    //     loadSessionUI(sessionId); // Cập nhật UI với message đã có
+    //     return;
+    // }
+
+    // *** THAY THẾ URL NÀY BẰNG ENDPOINT API LẤY MESSAGE THỰC TẾ ***
+    const messagesApiUrl = `http://172.20.10.44:8055/api/ChatSessions/${sessionId}`; // URL MỚI ĐÃ SỬA
+    console.log(`Fetching session details (including messages) for session ${sessionId} from ${messagesApiUrl}...`);
+
+     // Hiển thị loading tạm thời trong chatContainer
+    chatContainer.innerHTML = '<p class="text-center text-secondary-500 p-4">Đang tải tin nhắn...</p>';
+    currentSessionId = sessionId; // Cập nhật ID hiện tại ngay
     updateHistorySidebar();
-    
-    // Hiển thị tin nhắn chào mừng
-    showWelcomeMessage();
+
+    try {
+        const response = await fetch(messagesApiUrl);
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error(`Server response error fetching messages for ${sessionId}:`, errorText);
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        //const messagesData = await response.json(); // Dữ liệu trả về là object session, không phải chỉ messages
+        const sessionData = await response.json();
+        console.log(`Session data received for session ${sessionId}:`, sessionData);
+
+        // Giả sử API trả về một OBJECT session chứa mảng messages:
+        // { id: '...', title: '...', messages: [{...}, {...}] }
+        // Cần điều chỉnh dựa trên cấu trúc thực tế
+        if (!sessionData || !Array.isArray(sessionData.messages)) {
+             console.error('Session API did not return expected format (object with messages array):', sessionData);
+             throw new Error('Invalid session data format from API');
+        }
+
+        // Cập nhật mảng messages cho session tương ứng trong chatSessions
+        const targetSession = chatSessions.find(s => s.id === sessionId);
+        if (targetSession) {
+            // Cập nhật messages từ dữ liệu API
+            targetSession.messages = sessionData.messages.map(msg => ({
+                message: msg.content || msg.message || '', // Điều chỉnh key dựa vào API
+                isUser: msg.isUser || (msg.role === 'user'), // Điều chỉnh key/logic dựa vào API
+                timestamp: msg.timestamp || msg.createdAt || Date.now() // Điều chỉnh key dựa vào API
+                 // id: msg.id || undefined // Lưu message ID nếu có
+            }));
+            // Cập nhật thêm thông tin khác nếu cần (title, conversationId...)
+            targetSession.title = sessionData.title || targetSession.title;
+            targetSession.conversationId = sessionData.conversationId || targetSession.conversationId;
+
+            // Có thể cần lưu lại vào localStorage nếu bạn muốn cache tin nhắn
+            // saveChatSessions();
+        } else {
+            console.error(`Session ${sessionId} not found after fetching messages?`);
+            // Xử lý lỗi này, có thể tạo session mới?
+        }
+
+        // Sau khi có messages, cập nhật UI
+        loadSessionUI(sessionId);
+
+    } catch (error) {
+        console.error(`Lỗi khi tải tin nhắn cho session ${sessionId}:`, error);
+        showNotification(`Không thể tải tin nhắn cho cuộc trò chuyện này.`, 'error');
+        chatContainer.innerHTML = '<p class="text-center text-red-500 p-4">Lỗi tải tin nhắn. Vui lòng thử lại.</p>';
+        // Có thể xóa messages[] của session này để thử lại lần sau?
+        const targetSession = chatSessions.find(s => s.id === sessionId);
+        if (targetSession) {
+            targetSession.messages = []; // Reset messages khi lỗi
+        }
+    }
+}
+
+// Sửa startNewChat để tạo session qua API
+async function startNewChat() { // <<< Đánh dấu là async
+    console.log('Starting new chat via API...');
+    const apiUrl = 'http://172.20.10.44:8055/api/ChatSessions';
+    const defaultTitle = "Cuộc trò chuyện mới"; // Hoặc tạo title động nếu muốn
+
+    // Lấy userId từ localStorage (Key là 'apiUserInfo')
+    let userId = 0; // Giá trị mặc định nếu không lấy được
+    try {
+        const userInfoString = localStorage.getItem('apiUserInfo');
+        if (userInfoString) {
+            const userInfo = JSON.parse(userInfoString);
+            if (userInfo && userInfo.data && userInfo.data.userId) {
+                userId = parseInt(userInfo.data.userId, 10); // Lấy userId từ data object
+            } else {
+                console.warn("Dữ liệu người dùng trong localStorage không đúng định dạng (thiếu data.userId).", userInfo);
+            }
+        } else {
+            console.warn("Không tìm thấy thông tin người dùng ('apiUserInfo') trong localStorage.");
+        }
+    } catch (error) {
+        console.error("Lỗi khi đọc hoặc parse thông tin người dùng từ localStorage:", error);
+        // Có thể thông báo lỗi cho người dùng
+        showNotification("Lỗi lấy thông tin người dùng. Không thể tạo chat mới.", "error");
+        return; // Dừng lại nếu lỗi nghiêm trọng
+    }
+
+    if (userId === 0 || isNaN(userId)) {
+        console.error("UserId không hợp lệ sau khi lấy từ localStorage. Không thể tạo chat mới.");
+        showNotification("Lỗi xác thực người dùng. Không thể tạo chat mới.", "error");
+        return; // Ngăn không cho tạo nếu không có userId hợp lệ
+    }
+
+    // Hiển thị trạng thái đang tạo (tùy chọn)
+    // Ví dụ: làm mờ sidebar, hiển thị loading...
+
+    try {
+        const response = await fetch(apiUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                // Thêm header Authorization nếu API yêu cầu
+                // 'Authorization': `Bearer ${your_token}`
+            },
+            body: JSON.stringify({
+                userId: userId, // <<< Sử dụng userId đã lấy và parse được
+                title: defaultTitle
+            })
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('API response error on creating session:', errorText);
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const newSessionData = await response.json();
+        console.log('New session created via API:', newSessionData);
+
+        // --- XỬ LÝ DỮ LIỆU SESSION MỚI TỪ API ---
+        // Giả định API trả về object chứa thông tin session mới
+        // Cần điều chỉnh key dựa trên cấu trúc thực tế của API response
+        const newSession = {
+            id: newSessionData.id || generateUniqueId(), // Lấy ID từ API là quan trọng nhất
+            title: newSessionData.title || defaultTitle, // Lấy title từ API hoặc dùng mặc định
+            messages: [], // Session mới chưa có tin nhắn
+            timestamp: newSessionData.timestamp || newSessionData.createdAt || Date.now(), // Lấy timestamp từ API
+            conversationId: newSessionData.conversationId || '' // Lấy conversationId nếu API trả về
+        };
+        // --- KẾT THÚC XỬ LÝ DỮ LIỆU ---
+
+        // Thêm session mới vào đầu mảng (để hiển thị lên đầu)
+        chatSessions.unshift(newSession);
+
+        // Đặt session mới là session hiện tại
+        currentSessionId = newSession.id;
+
+        // Xóa nội dung khu vực chat cũ
+        chatContainer.innerHTML = '';
+
+        // Cập nhật sidebar để hiển thị session mới
+        updateHistorySidebar();
+
+        // Tải giao diện cho session mới (sẽ thường là trống)
+        // Hàm này sẽ tự động gọi showWelcomeMessage nếu session không có message
+        loadSessionUI(currentSessionId);
+        
+        // Không cần gọi saveChatSessions() vì session đã được tạo trên server
+
+    } catch (error) {
+        console.error('Lỗi khi tạo phiên chat mới qua API:', error);
+        showNotification('Không thể tạo cuộc trò chuyện mới. Vui lòng thử lại.', 'error');
+        // Có thể cần xử lý thêm ở đây, ví dụ không chuyển session
+    }
 }
 
 // Xóa toàn bộ lịch sử chat
@@ -793,16 +950,106 @@ function showLoading(show) {
     }
 }
 
-// Hàm gọi API cho chatbot từ trolyai.hub.edu.vn với hỗ trợ streaming
-async function callChatbotAPI(message, conversationId = '') {
-    // showTypingIndicator(); // Hiển thị hiệu ứng đang gõ
+// Xử lý gửi tin nhắn - ĐÃ SỬA ĐỂ DÙNG sendChatMessage
+async function handleSendMessage() {
+    const message = messageInput.value.trim();
+    
+    // Kiểm tra có nội dung cần gửi không
+    if (!message) return;
+    
+    // Thêm tin nhắn người dùng vào UI và xóa input
+    addMessageToChat(message, true);
+    messageInput.value = '';
+    
+    // Lấy conversationId từ phiên hiện tại (nếu có)
+    let currentConversationIdForAPI = null; // Default là null cho API
+    let currentSession = null;
+    if (currentSessionId) {
+        currentSession = chatSessions.find(s => s.id === currentSessionId);
+        if (currentSession && currentSession.conversationId) {
+            currentConversationIdForAPI = currentSession.conversationId;
+        }
+    }
 
-    try {
-        // Tạo message placeholder để hiển thị streaming response
-        const placeholderId = `msg-${Date.now()}`;
-        const messageElement = addMessageToChat('', false, true, placeholderId);
+    // Hiển thị tạm thời hiệu ứng loading hoặc tin nhắn chờ
+    const loadingMsgElement = addMessageToChat('', false, false, `loading-${Date.now()}`); // Tạo tin nhắn chờ
+    // (Cần CSS cho .ellipsis-animation hoặc nội dung chờ khác)
+    const loadingContent = loadingMsgElement.querySelector('.message-content');
+    if (loadingContent) {
+        loadingContent.innerHTML = `<div class="ellipsis-animation"><span>.</span><span>.</span><span>.</span></div>`;
+    }
+    chatContainer.scrollTop = chatContainer.scrollHeight;
+
+    // Gọi API chat từ chat.js
+    const responseData = await sendChatMessage(message, currentConversationIdForAPI);
+
+    // Xóa tin nhắn loading
+    loadingMsgElement.remove();
+
+    if (responseData) {
+        // Thêm tin nhắn phản hồi của bot vào UI
+        // Giả sử responseData.response chứa tin nhắn trả về
+        const botMessage = responseData.response || "Xin lỗi, tôi không nhận được phản hồi.";
+        addMessageToChat(botMessage, false, true); // Lưu tin nhắn bot vào session
         
-        // Streaming mode - fetch với stream true
+        // Cập nhật conversationId nếu API trả về và khác với cái hiện tại
+        const newConversationId = responseData.conversation_id;
+        if (newConversationId && currentSession && newConversationId !== currentSession.conversationId) {
+            console.log(`Updated conversation ID for session ${currentSessionId} to ${newConversationId}`);
+            currentSession.conversationId = newConversationId;
+            saveChatSessions(); // Lưu lại session với conversation ID mới
+        }
+        
+        // Nếu không có lỗi và phiên chat đang dùng tên mặc định, cập nhật tên phiên chat
+        if (currentSession && currentSession.name.startsWith('Chat ') && message.length > 0) {
+            // Tạo tên phiên chat từ tin nhắn đầu tiên của người dùng
+            currentSession.name = message.length > 25 ? message.substring(0, 22) + '...' : message;
+            saveChatSessions();
+            updateHistorySidebar();
+        }
+
+    } else {
+        // Xử lý lỗi khi gọi API (sendChatMessage trả về null)
+        addMessageToChat('Xin lỗi, đã có lỗi xảy ra khi gửi tin nhắn. Vui lòng thử lại.', false, false); // Không lưu tin nhắn lỗi vào session
+    }
+}
+
+// Hiển thị tin nhắn chào mừng - CẦN ĐIỀU CHỈNH NẾU API WELCOME KHÁC
+// Hiện tại đang giữ lại logic cũ gọi callChatbotAPI cho welcome message.
+// Nếu API welcome của bạn khác, cần sửa hàm này.
+async function showWelcomeMessage() {
+    chatContainer.innerHTML = '';
+    hideStaticWelcomeMessage();
+    
+    // TẠM THỜI: Gọi API chat mới với query đặc biệt nếu cần
+    // Hoặc hiển thị tin nhắn chào mừng tĩnh nếu không có API riêng
+    // const welcomeResponse = await sendChatMessage("__GET_WELCOME__", null);
+    // if (welcomeResponse && welcomeResponse.response) {
+    //    addMessageToChat(welcomeResponse.response, false, false);
+    // } else {
+    //    addMessageToChat("Chào bạn! Tôi có thể giúp gì?", false, false);
+    // }
+    
+    // GIỮ LOGIC CŨ CHO WELCOME (có thể cần thay đổi sau)
+    try {
+        const { firstBotMessage } = await callChatbotAPI_forWelcomeOnly('###__get_welcome_message__###', '');
+        if (firstBotMessage) {
+            addMessageToChat(firstBotMessage, false, false); 
+            const lastMessage = chatContainer.lastElementChild;
+            if (lastMessage) lastMessage.classList.add('welcome-message');
+        } else {
+             addMessageToChat("Chào mừng bạn đến với Trợ lý AI! Bạn cần hỗ trợ gì?", false, false);
+        }
+    } catch (welcomeError) {
+         console.error("Error getting welcome message:", welcomeError);
+         addMessageToChat("Chào mừng bạn đến với Trợ lý AI! Rất tiếc, tôi không thể tải lời chào tự động.", false, false);
+    }
+}
+
+// TẠO BẢN SAO CỦA callChatbotAPI CHỈ ĐỂ DÙNG CHO WELCOME MESSAGE
+// ĐIỀU NÀY LÀ TẠM THỜI - NÊN CÓ API WELCOME RIÊNG HOẶC DÙNG sendChatMessage
+async function callChatbotAPI_forWelcomeOnly(message, conversationId = '') {
+    try {
         const response = await fetch('http://trolyai.hub.edu.vn/v1/chat-messages', {
             method: 'POST',
             headers: {
@@ -812,350 +1059,34 @@ async function callChatbotAPI(message, conversationId = '') {
             body: JSON.stringify({
                 inputs: {},
                 query: message,
-                response_mode: 'streaming', // Chế độ streaming
+                response_mode: 'streaming',
                 conversation_id: conversationId,
                 user: 'user'
             })
         });
-        
-        if (!response.ok) {
-            throw new Error(`Lỗi kết nối API: ${response.status} ${response.statusText}`);
-        }
-
-        // Xử lý stream data
+        if (!response.ok) throw new Error(`API error: ${response.status}`);
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
-        let accumulatedResponse = '';
-        let conversationIdFromStream = '';
         let firstBotMessage = '';
-        
-        // Tìm message element để cập nhật nội dung
-        if (!messageElement) {
-            throw new Error('Không tìm thấy phần tử tin nhắn để cập nhật');
-        }
-        
-        // Tìm hoặc tạo phần tử content
-        let textElement = messageElement.querySelector('.message-content');
-        if (!textElement) {
-            const messageRow = messageElement.querySelector('div[class^="flex items-start"]');
-            if (!messageRow) {
-                throw new Error('Không tìm thấy message row để thêm nội dung');
-            }
-            
-            // Tạo content container nếu không tồn tại
-            const contentDiv = messageRow.querySelector('div[class^="bg-secondary-100"]');
-            if (contentDiv) {
-                // Đảm bảo có class message-content
-                contentDiv.classList.add('message-content');
-                 // Placeholder đã được tạo trong addMessageToChat, không cần tạo lại ở đây 
-                 // textElement = contentDiv; 
-            } else {
-                // Trường hợp này không nên xảy ra nếu addMessageToChat đã chạy đúng
-                console.error("Không tìm thấy contentDiv cho placeholder");
-                throw new Error('Không tìm thấy contentDiv cho placeholder');
-                // const newContentDiv = document.createElement('div');
-                // newContentDiv.className = 'bg-secondary-100 text-secondary-800 px-4 py-2 rounded-t-2xl rounded-br-2xl max-w-[85%] shadow-sm message-content';
-                // messageRow.appendChild(newContentDiv);
-                // textElement = newContentDiv;
-            }
-        }
-        
-        // Lấy tham chiếu đến các phần tử con
-        const ellipsisDiv = messageElement.querySelector('.ellipsis-animation');
-        const markdownContainer = messageElement.querySelector('.markdown-content');
-
-        if (!ellipsisDiv || !markdownContainer) {
-            console.error("Không tìm thấy phần tử ellipsis hoặc markdown trong placeholder:", messageElement);
-            throw new Error('Cấu trúc placeholder không đúng.');
-        }
-        
-        // markdownContainer.innerHTML = '...'; // Không cần đặt "..." ở đây nữa
-        let isFirstChunk = true; // Cờ để kiểm tra chunk đầu tiên
-        
         while (true) {
             const { done, value } = await reader.read();
             if (done) break;
-            
             const chunk = decoder.decode(value, { stream: true });
-            const lines = chunk.split('\n').filter(line => line.trim() !== '');
-            
+            const lines = chunk.split('\n').filter(line => line.startsWith('data: '));
             for (const line of lines) {
-                if (line.startsWith('data: ')) {
-                    try {
-                        const data = JSON.parse(line.substring(6));
-                        
-                        if (data.event === 'message') {
-                            // Cập nhật tin nhắn streaming
-                            accumulatedResponse += data.answer || '';
-                            if (!firstBotMessage && data.answer) {
-                                firstBotMessage = data.answer;
-                            }
-                            
-                            // Render nội dung markdown, xóa "..." nếu là chunk đầu tiên
-                            if (isFirstChunk) {
-                                if (ellipsisDiv) ellipsisDiv.style.display = 'none'; // Ẩn ellipsis
-                                if (markdownContainer) markdownContainer.style.display = 'block'; // Hiện markdown container
-                                markdownContainer.innerHTML = renderMarkdown(accumulatedResponse);
-                                isFirstChunk = false;
-                            } else {
-                                markdownContainer.innerHTML = renderMarkdown(accumulatedResponse);
-                            }
-                            
-                            // Áp dụng highlight cho code blocks sau khi thêm nội dung markdown
-                            setTimeout(() => {
-                                highlightCodeBlocks(markdownContainer);
-                            }, 10);
-                            
-                            // Cuộn xuống khi có nội dung mới
-                            chatContainer.scrollTop = chatContainer.scrollHeight;
-                            
-                            // Lưu conversation_id nếu có
-                            if (data.conversation_id && !conversationIdFromStream) {
-                                conversationIdFromStream = data.conversation_id;
-                            }
-                        } else if (data.event === 'message_end' || data.event === 'done') {
-                            // Stream đã hoàn tất
-                            // messageElement.classList.remove('typing'); // Bỏ class typing
-                            // Đảm bảo ellipsis bị ẩn nếu stream kết thúc mà không có message event nào
-                            if (isFirstChunk && ellipsisDiv) {
-                                ellipsisDiv.style.display = 'none';
-                                if (markdownContainer) markdownContainer.style.display = 'block'; // Hiện container rỗng nếu không có nội dung
-                            }
-                             
-                        } else if (data.event === 'error') {
-                             console.error('Lỗi từ API stream:', data);
-                             if (ellipsisDiv) ellipsisDiv.style.display = 'none';
-                             if (markdownContainer) {
-                                markdownContainer.style.display = 'block';
-                                markdownContainer.innerHTML = renderMarkdown(data.error || 'Lỗi không xác định từ API');
-                             }
-                             // Có thể thêm xử lý lỗi cụ thể ở đây
-                        }
-                    } catch (e) {
-                        console.error('Lỗi khi parse JSON từ stream:', e);
-                    }
+                const data = JSON.parse(line.substring(6));
+                if (data.event === 'message' && data.answer && !firstBotMessage) {
+                    firstBotMessage = data.answer;
+                    // Có thể break sớm nếu chỉ cần tin nhắn đầu tiên
+                     break; 
                 }
             }
+             if (firstBotMessage) break; // Thoát vòng lặp ngoài nếu đã có tin nhắn đầu
         }
-        
-        // Lưu conversation_id nếu có
-        if (conversationIdFromStream && currentSessionId) {
-            const session = chatSessions.find(s => s.id === currentSessionId);
-            if (session) {
-                session.conversationId = conversationIdFromStream;
-                 // Lưu lại tin nhắn cuối cùng của bot sau khi streaming hoàn tất
-                if (session.messages.length > 0) {
-                    const lastMessageIndex = session.messages.length - 1;
-                    if (!session.messages[lastMessageIndex].isUser && session.messages[lastMessageIndex].message === '') {
-                        session.messages[lastMessageIndex].message = accumulatedResponse || '(Không có phản hồi)';
-                    }
-                }
-                saveChatSessions();
-            }
-        }
-        
-        return {
-            answer: accumulatedResponse,
-            conversationId: conversationIdFromStream,
-            firstBotMessage
-        };
+        return { firstBotMessage };
     } catch (error) {
-        // hideTypingIndicator(); // Ẩn hiệu ứng đang gõ khi có lỗi
-        console.error('API Call Error:', error);
-        
-        // Nếu lỗi xảy ra sau khi đã tạo message placeholder, cập nhật lại
-        const errorPlaceholder = document.getElementById(placeholderId);
-        if (errorPlaceholder) {
-            const ellipsisDiv = errorPlaceholder.querySelector('.ellipsis-animation');
-            const markdownContainer = errorPlaceholder.querySelector('.markdown-content');
-            
-            if (ellipsisDiv) ellipsisDiv.style.display = 'none'; // Ẩn ellipsis khi lỗi
-            if (markdownContainer) { 
-                 markdownContainer.style.display = 'block'; // Hiện markdown container để hiển thị lỗi
-                 markdownContainer.textContent = 'Xin lỗi, đã có lỗi xảy ra khi kết nối đến trợ lý. Vui lòng thử lại sau.';
-            }
-            // errorPlaceholder.classList.remove('typing'); // Bỏ class typing
-        } else {
-            // Nếu không tìm thấy placeholder, tạo message lỗi mới
-            addMessageToChat('Xin lỗi, đã có lỗi xảy ra khi kết nối đến trợ lý. Vui lòng thử lại sau.', false);
-        }
-        
-        return {
-            answer: 'Xin lỗi, đã có lỗi xảy ra khi kết nối đến trợ lý. Vui lòng thử lại sau.',
-            error: true
-        };
-    }
-}
-
-/**
- * Chuyển đổi văn bản markdown thành HTML (phiên bản tối ưu hơn)
- * @param {string} text - Văn bản markdown cần chuyển đổi
- * @returns {string} HTML đã được render
- */
-function renderMarkdown(text) {
-    if (!text) return '';
-    let html = text
-        // Code block
-        .replace(/```([\w-]*)\n([\s\S]*?)\n```/g, (m, lang, code) => `<pre><code class="hljs language-${lang.trim()}">${code.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</code></pre>`)
-        // Inline code
-        .replace(/`([^`]+?)`/g, '<code class="inline-code bg-secondary-100 text-secondary-800 px-1 rounded font-mono">$1</code>')
-        // Bold
-        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-        // Italic
-        .replace(/\*(.+?)\*/g, '<em>$1</em>')
-        // Link
-        .replace(/\[([^\]]+?)\]\(([^)]+?)\)/g, '<a href="$2" target="_blank" class="text-primary-600 hover:underline">$1</a>')
-        // Blockquote
-        .replace(/^> (.*)$/gm, '<blockquote class="pl-4 border-l-4 border-primary-500 italic my-4 text-secondary-600">$1</blockquote>')
-        // Header
-        .replace(/^### (.*)$/gm, '<h3 class="text-lg font-bold my-2">$1</h3>')
-        .replace(/^## (.*)$/gm, '<h2 class="text-xl font-bold my-3">$1</h2>')
-        .replace(/^# (.*)$/gm, '<h1 class="text-2xl font-bold my-4">$1</h1>')
-        // Unordered list
-        .replace(/^\s*[-*] (.*)$/gm, '<ul class="my-2"><li class="ml-4 list-disc">$1</li></ul>')
-        // Ordered list
-        .replace(/^\s*\d+\. (.*)$/gm, '<ol class="my-2"><li class="ml-4 list-decimal">$1</li></ol>')
-        // Paragraph
-        .replace(/\n{2,}/g, '</p><p class="my-2">')
-        .replace(/^(?!<h\d|<ul|<ol|<blockquote|<pre|<p)(.+)$/gm, '<p class="my-2">$1</p>');
-    // Dọn dẹp thẻ p lồng nhau
-    html = html.replace(/<p class="my-2">\s*<\/p>/g, '');
-    return html;
-}
-
-/**
- * Highlight code blocks trong container
- * @param {HTMLElement} container - Container chứa code cần highlight
- */
-function highlightCodeBlocks(container) {
-    if (!container || typeof hljs === 'undefined') return;
-    
-    try {
-        // Lấy tất cả các code blocks
-        const codeBlocks = container.querySelectorAll('pre code');
-        if (codeBlocks.length === 0) return;
-        
-        // Highlight từng block
-        codeBlocks.forEach(block => {
-            // Thêm padding cho block
-            const preTag = block.parentElement;
-            if (preTag) {
-                preTag.classList.add('rounded-lg', 'overflow-x-auto', 'my-4');
-            }
-            
-            // Highlight với hljs
-            hljs.highlightElement(block);
-            
-            // Thêm nút copy code nếu chưa có
-            if (!preTag.querySelector('.copy-code-button')) {
-                const copyButton = document.createElement('button');
-                copyButton.className = 'copy-code-button absolute top-2 right-2 bg-secondary-200 bg-opacity-80 hover:bg-secondary-300 text-secondary-800 rounded px-2 py-1 text-xs';
-                copyButton.textContent = 'Sao chép';
-                copyButton.onclick = function() {
-                    const code = block.textContent;
-                    navigator.clipboard.writeText(code).then(() => {
-                        copyButton.textContent = 'Đã sao chép!';
-                        setTimeout(() => {
-                            copyButton.textContent = 'Sao chép';
-                        }, 2000);
-                    }).catch(err => {
-                        console.error('Không thể sao chép code:', err);
-                    });
-                };
-                
-                // Thêm position relative cho pre tag để có thể định vị button
-                if (preTag) {
-                    preTag.style.position = 'relative';
-                    preTag.appendChild(copyButton);
-                }
-            }
-        });
-    } catch (error) {
-        console.error('Lỗi khi highlight code:', error);
-    }
-}
-
-// Xử lý gửi tin nhắn
-async function handleSendMessage() {
-    const message = messageInput.value.trim();
-    
-    // Kiểm tra có nội dung cần gửi không
-    if (!message) return;
-    
-    // Xóa nội dung input
-    addMessageToChat(message, true);
-    messageInput.value = '';
-    
-    // Lấy conversationId từ phiên hiện tại (nếu có)
-    let conversationId = '';
-    if (currentSessionId) {
-        const session = chatSessions.find(s => s.id === currentSessionId);
-        if (session && session.conversationId) {
-            conversationId = session.conversationId;
-        }
-    }
-
-    if (message) {
-        const { answer, conversationId: newConversationId, error } = await callChatbotAPI(message, conversationId);
-        
-        // Không cần thêm message khi streaming vì đã tạo trước đó
-        
-        // Nếu không có lỗi và phiên chat đang dùng tên mặc định, cập nhật tên phiên chat
-        if (!error && currentSessionId) {
-            const session = chatSessions.find(s => s.id === currentSessionId);
-            if (session && session.name.startsWith('Chat ') && message.length > 0) {
-                // Tạo tên phiên chat từ tin nhắn đầu tiên của người dùng
-                session.name = message.length > 25 ? message.substring(0, 22) + '...' : message;
-                saveChatSessions();
-                updateHistorySidebar();
-            }
-        }
-    } else {
-        // Xử lý khi không có nội dung tin nhắn (trước đây là chỉ gửi file)
-        // Có thể thêm thông báo yêu cầu nhập tin nhắn
-        showNotification('Vui lòng nhập tin nhắn để gửi', 'warning');
-    }
-}
-
-// Hiển thị tin nhắn chào mừng từ dify (không hard code, chỉ 1 tin nhắn duy nhất, không lưu vào session)
-async function showWelcomeMessage() {
-    chatContainer.innerHTML = '';
-    hideStaticWelcomeMessage();
-    // Gọi API lấy chào mừng, KHÔNG lưu vào chatSessions/messages
-    const { firstBotMessage } = await callChatbotAPI('###__get_welcome_message__###', '');
-    if (firstBotMessage) {
-        // Hiển thị chào mừng nhưng không lưu vào session.messages
-        addMessageToChat(firstBotMessage, false, false);
-        const lastMessage = chatContainer.lastElementChild;
-        if (lastMessage) lastMessage.classList.add('welcome-message');
-    }
-}
-
-// Lấy danh sách lịch sử chat từ API Directus
-async function fetchChatSessionsFromAPI() {
-    try {
-        const response = await fetch('http://172.20.10.44:8055/api/ChatSessions');
-        if (!response.ok) throw new Error('Lỗi khi lấy lịch sử chat từ API');
-        const data = await response.json();
-        // data có thể là { data: [...] } hoặc mảng trực tiếp
-        return Array.isArray(data) ? data : (data.data || []);
-    } catch (err) {
-        console.error('Không thể lấy lịch sử chat từ API:', err);
-        return [];
-    }
-}
-
-// Gọi API và cập nhật sidebar lịch sử chat khi load trang
-async function updateHistorySidebarFromAPI() {
-    const apiSessions = await fetchChatSessionsFromAPI();
-    if (Array.isArray(apiSessions) && apiSessions.length > 0) {
-        historySessions.innerHTML = '';
-        apiSessions.forEach(session => {
-            const sessionItem = document.createElement('div');
-            sessionItem.className = 'p-3 rounded-lg cursor-pointer text-sm truncate flex justify-between items-center mb-2 transition-all hover:shadow-hover bg-secondary-100 text-secondary-700 hover:bg-secondary-200';
-            sessionItem.innerHTML = `<div class='flex-grow truncate'><div class='font-medium truncate'>${session.Title || 'Chat không tên'}</div><div class='text-xs text-secondary-500 truncate mt-1'>${session.CreatedAt ? new Date(session.CreatedAt).toLocaleString('vi-VN') : ''}</div></div>`;
-            historySessions.appendChild(sessionItem);
-        });
+        console.error('Welcome API Call Error:', error);
+        return { firstBotMessage: null }; // Trả về null nếu lỗi
     }
 }
 
@@ -1174,7 +1105,8 @@ clearHistoryButton.addEventListener('click', clearChatHistory);
 recordButton.addEventListener('click', toggleRecording);
 
 // Initial Load
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => { // <<< Đánh dấu là async
+    console.log('DOM fully loaded and parsed');
     // Kiểm tra đăng nhập trước khi tải chatbot
     if (!checkAuthentication()) {
          // Nếu chưa đăng nhập, hàm checkAuthentication đã xử lý chuyển hướng.
@@ -1191,8 +1123,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Hiển thị thông tin người dùng nếu có
     displayUserInfo();
 
-    // Tải các phiên chat
-    loadChatSessions();
+    // Tải các phiên chat từ API bằng hàm đã sửa đổi
+    await loadChatSessions(); // <<< Gọi hàm đã sửa
     initSpeechRecognition();
 
     // Set sự kiện cho form input để tránh reload trang
@@ -1209,16 +1141,19 @@ document.addEventListener('DOMContentLoaded', () => {
     if (newChatButtonSidebar) {
         newChatButtonSidebar.addEventListener('click', startNewChat);
     }
-    // updateHistorySidebarFromAPI(); // Tạm thời comment nếu chưa dùng API
+
+    // Hiển thị thông báo chào mừng hoặc tin nhắn session đã tải
+    // Logic này đã được chuyển vào trong loadSessionMessages / loadSessionUI
 });
 
 /**
  * Xóa một phiên chat
  * @param {string} sessionId - ID của phiên chat cần xóa
  */
-function deleteSession(sessionId) {
-    const sessionElement = document.getElementById(`session-${sessionId}`);
-    if (!sessionElement) return;
+async function deleteSession(sessionId) { // <<< Đánh dấu là async
+    // Tạm thời bỏ qua tìm element vì chúng ta sẽ xóa dựa trên API
+    // const sessionElement = document.getElementById(`session-${sessionId}`);
+    // if (!sessionElement) return;
     
     // Hiển thị hộp thoại xác nhận
     const confirmDialog = document.createElement('div');
@@ -1226,7 +1161,7 @@ function deleteSession(sessionId) {
     confirmDialog.innerHTML = `
         <div class="bg-[#343541] rounded-lg p-6 max-w-md w-full mx-4">
             <h3 class="text-xl font-semibold text-white mb-4">Xác nhận xóa</h3>
-            <p class="text-gray-300 mb-6">Bạn có chắc chắn muốn xóa phiên chat này không?</p>
+            <p class="text-gray-300 mb-6">Bạn có chắc muốn xóa cuộc trò chuyện này không?</p>
             <div class="flex justify-end gap-3">
                 <button id="cancel-delete" class="px-4 py-2 rounded-md bg-gray-600 text-white hover:bg-gray-700 transition-colors">Hủy</button>
                 <button id="confirm-delete" class="px-4 py-2 rounded-md bg-red-600 text-white hover:bg-red-700 transition-colors">Xóa</button>
@@ -1241,43 +1176,65 @@ function deleteSession(sessionId) {
         document.body.removeChild(confirmDialog);
     });
     
-    document.getElementById('confirm-delete').addEventListener('click', () => {
-        // Tìm và lưu phiên chat bị xóa vào sessionStorage để có thể khôi phục
-        const sessionIndex = chatSessions.findIndex(s => s.id === sessionId);
-        
-        if (sessionIndex !== -1) {
-            const deletedSession = chatSessions[sessionIndex];
-            sessionStorage.setItem('lastDeletedSession', JSON.stringify(deletedSession));
-            
-            // Xóa phiên khỏi danh sách
-            chatSessions.splice(sessionIndex, 1);
-            
-            // Lưu vào localStorage
-            saveChatSessions();
-            
-            // Chọn phiên chat mới nếu phiên bị xóa đang được chọn
-            if (currentSessionId === sessionId) {
-                if (chatSessions.length > 0) {
-                    loadSession(chatSessions[0].id);
-                } else {
-                    // Tạo phiên mới nếu không còn phiên nào
-                    startNewChat();
-                }
-            }
-            
-            // Cập nhật giao diện
-            updateHistorySidebar();
-            
-            // Hiển thị thông báo với nút khôi phục
-            showNotificationWithAction(
-                'Đã xóa phiên chat',
-                'Khôi phục',
-                () => recoverLastDeletedSession()
-            );
+    document.getElementById('confirm-delete').addEventListener('click', async () => { // <<< Đánh dấu là async
+        const apiUrl = `http://172.20.10.44:8055/api/ChatSessions/${sessionId}`;
+        console.log(`Attempting to delete session ${sessionId} via API: ${apiUrl}`);
+
+        // Lấy token từ localStorage
+        const userInfo = getUserInfo(); // Hàm này cần được định nghĩa và hoạt động
+        console.log('User info:', userInfo);
+        if (!userInfo || !userInfo.token) {
+            showNotification('Lỗi xác thực. Không thể xóa phiên chat.', 'error');
+            document.body.removeChild(confirmDialog);
+            return;
         }
-        
-        // Đóng hộp thoại
-        document.body.removeChild(confirmDialog);
+
+        // Hiển thị loading
+        const confirmButton = document.getElementById('confirm-delete');
+        confirmButton.textContent = 'Đang xóa...';
+        confirmButton.disabled = true;
+
+        try {
+            const response = await fetch(apiUrl, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${userInfo.token}`
+                }
+            });
+
+            if (response.ok) { 
+                console.log(`Session ${sessionId} deleted successfully via API.`);
+                showNotification('Đã xóa phiên chat thành công.', 'success');
+
+                // --- REFRESH LỊCH SỬ CHAT SAU KHI XÓA THÀNH CÔNG ---
+                await loadChatSessions(); // Gọi hàm load lại toàn bộ lịch sử từ API
+                // Hàm loadChatSessions sẽ tự động cập nhật mảng, sidebar và tải session mới nhất (nếu có)
+                // Không cần xóa thủ công ở client hay chọn session mới ở đây nữa.
+
+            } else {
+                // API trả về lỗi
+                const errorText = await response.text();
+                console.error(`API error deleting session ${sessionId}: ${response.status}`, errorText);
+                showNotification(`Lỗi xóa phiên chat: ${response.statusText || 'Lỗi không xác định'}`, 'error');
+                 // Reset nút xóa nếu lỗi
+                 confirmButton.textContent = 'Xóa';
+                 confirmButton.disabled = false;
+            }
+
+        } catch (error) {
+            // Lỗi mạng hoặc lỗi fetch
+            console.error(`Network error deleting session ${sessionId}:`, error);
+            showNotification('Lỗi mạng khi xóa phiên chat. Vui lòng thử lại.', 'error');
+             // Reset nút xóa nếu lỗi
+             confirmButton.textContent = 'Xóa';
+             confirmButton.disabled = false;
+        } finally {
+            // Đóng hộp thoại (chỉ đóng nếu còn tồn tại)
+            if (document.body.contains(confirmDialog)) {
+                document.body.removeChild(confirmDialog);
+            }
+            // Nút đã được reset ở trên nếu có lỗi, không cần reset ở đây
+        }
     });
 }
 
