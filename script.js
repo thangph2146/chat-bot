@@ -1176,23 +1176,25 @@ recordButton.addEventListener('click', toggleRecording);
 // Initial Load
 document.addEventListener('DOMContentLoaded', () => {
     // Kiểm tra đăng nhập trước khi tải chatbot
-    // if (!checkAuthentication()) {
-    //     return; // Nếu chưa đăng nhập thì dừng lại
-    // }
-    
+    if (!checkAuthentication()) {
+         // Nếu chưa đăng nhập, hàm checkAuthentication đã xử lý chuyển hướng.
+         // Không cần thực hiện các hành động tải chat phía dưới.
+         return; // Dừng thực thi tiếp trong sự kiện này
+    }
+
     // Xử lý nút đăng xuất
-    // const logoutButton = document.getElementById('logoutButton');
-    // if (logoutButton) {
-    //     logoutButton.addEventListener('click', handleUserLogout);
-    // }
-    
+    const logoutButton = document.getElementById('logoutButton');
+    if (logoutButton) {
+        logoutButton.addEventListener('click', handleUserLogout);
+    }
+
     // Hiển thị thông tin người dùng nếu có
-    // displayUserInfo();
-    
+    displayUserInfo();
+
     // Tải các phiên chat
     loadChatSessions();
     initSpeechRecognition();
-    
+
     // Set sự kiện cho form input để tránh reload trang
     const form = document.querySelector('form');
     if (form) {
@@ -1201,13 +1203,13 @@ document.addEventListener('DOMContentLoaded', () => {
             handleSendMessage();
         });
     }
-    
+
     // Kết nối cho nút chat mới trong sidebar
     const newChatButtonSidebar = document.getElementById('newChatButtonSidebar');
     if (newChatButtonSidebar) {
         newChatButtonSidebar.addEventListener('click', startNewChat);
     }
-    updateHistorySidebarFromAPI(); // Lấy lịch sử chat từ API khi load trang
+    // updateHistorySidebarFromAPI(); // Tạm thời comment nếu chưa dùng API
 });
 
 /**
