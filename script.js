@@ -503,8 +503,8 @@ async function startNewChat() {
 
     // Lấy userId và token từ hàm getUserInfo()
     const userInfo = getUserInfo();
-    let userId = userInfo?.userId;
-    let userToken = userInfo?.token;
+    let userId = userInfo?.data?.userId;
+    let userToken = userInfo?.data?.token;
 
     if (!userId || isNaN(userId) || !userToken) {
         console.error("UserId hoặc Token không hợp lệ. Không thể tạo chat mới.", userInfo);
@@ -817,6 +817,112 @@ function hideStaticWelcomeMessage() {
     }
 }
 
+// Render Markdown và sanitize HTML
+function renderMarkdown(text) {
+    if (typeof marked === 'undefined') {
+        console.error('Thư viện MarkedJS chưa được tải.');
+        // Trả về text gốc, escape HTML để tránh XSS cơ bản
+        const escapedText = document.createElement('textarea');
+        escapedText.textContent = text;
+        return escapedText.innerHTML.replace(/\n/g, '<br>');
+    }
+    try {
+        // Cấu hình Marked để tương thích GFM và thêm ngắt dòng
+        marked.setOptions({
+            gfm: true,
+            breaks: true, // Thêm thẻ <br> cho ngắt dòng đơn
+            sanitize: false, // Tắt sanitize của marked, sẽ dùng DOMPurify
+            smartypants: false
+        });
+
+        const rawHtml = marked.parse(text);
+
+        // Sanitize HTML bằng DOMPurify nếu có
+        if (typeof DOMPurify === 'undefined') {
+            console.warn('Thư viện DOMPurify chưa được tải. HTML sẽ không được sanitize.');
+            return rawHtml;
+        } else {
+            return DOMPurify.sanitize(rawHtml, {
+                USE_PROFILES: { html: true }, // Cho phép các thẻ HTML cơ bản
+                ADD_ATTR: ['target'], // Cho phép thuộc tính target cho link
+                // FORBID_TAGS: ['img'] // Cấm thẻ nếu cần
+            });
+        }
+    } catch (error) {
+        console.error('Lỗi khi render Markdown:', error);
+        // Trả về text gốc nếu có lỗi render
+        const escapedText = document.createElement('textarea');
+        escapedText.textContent = text;
+        return escapedText.innerHTML.replace(/\n/g, '<br>');
+    }
+}
+
+// Highlight các khối code
+function highlightCodeBlocks(containerElement) {
+    if (typeof hljs === 'undefined') {
+        // console.warn('Thư viện Highlight.js chưa được tải.');
+        return; // Không làm gì nếu hljs không có
+    }
+    // Chỉ tìm và highlight trong containerElement được cung cấp
+    const codeBlocks = containerElement.querySelectorAll('pre code');
+    if (codeBlocks.length > 0) {
+        // console.log(`Highlighting ${codeBlocks.length} code blocks`);
+        codeBlocks.forEach((block) => {
+            try {
+                 // Kiểm tra xem đã được highlight chưa
+                 if (!block.classList.contains('hljs') && !block.dataset.highlighted) {
+                    hljs.highlightElement(block);
+                    block.dataset.highlighted = 'true'; // Đánh dấu đã highlight
+                    // Thêm nút copy
+                    addCopyButton(block.parentNode); // Gắn nút vào thẻ <pre>
+                }
+            } catch (error) {
+                console.error('Lỗi khi highlight code block:', error, block.textContent);
+            }
+        });
+    }
+}
+
+// Thêm nút copy vào khối pre
+function addCopyButton(preElement) {
+    if (!preElement || preElement.querySelector('.copy-code-btn')) {
+        return; // Không thêm nếu không có pre hoặc nút đã tồn tại
+    }
+
+    const button = document.createElement('button');
+    button.className = 'copy-code-btn';
+    button.title = 'Copy code';
+    // SVG Icon (ví dụ)
+    button.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-clipboard" viewBox="0 0 16 16">
+        <path d="M4 1.5H3a2 2 0 0 0-2 2V14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3.5a2 2 0 0 0-2-2h-1v1h1a1 1 0 0 1 1 1V14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1h1v-1z"/>
+        <path d="M9.5 1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5h3zm-3-1A1.5 1.5 0 0 0 5 1.5v1A1.5 1.5 0 0 0 6.5 4h3A1.5 1.5 0 0 0 11 2.5v-1A1.5 1.5 0 0 0 9.5 0h-3z"/>
+      </svg>`;
+
+    button.addEventListener('click', () => {
+        const codeElement = preElement.querySelector('code');
+        if (codeElement) {
+            const codeToCopy = codeElement.innerText;
+            navigator.clipboard.writeText(codeToCopy).then(() => {
+                button.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-check-lg" viewBox="0 0 16 16">
+                    <path d="M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425a.247.247 0 0 1 .02-.022z"/>
+                  </svg>`; // Icon check
+                setTimeout(() => {
+                    button.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-clipboard" viewBox="0 0 16 16">
+                        <path d="M4 1.5H3a2 2 0 0 0-2 2V14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3.5a2 2 0 0 0-2-2h-1v1h1a1 1 0 0 1 1 1V14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1h1v-1z"/>
+                        <path d="M9.5 1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5h3zm-3-1A1.5 1.5 0 0 0 5 1.5v1A1.5 1.5 0 0 0 6.5 4h3A1.5 1.5 0 0 0 11 2.5v-1A1.5 1.5 0 0 0 9.5 0h-3z"/>
+                      </svg>`; // Reset icon
+                }, 1500);
+            }).catch(err => {
+                console.error('Không thể copy code:', err);
+                showNotification('Lỗi khi copy code', 'error');
+            });
+        }
+    });
+
+    preElement.style.position = 'relative'; // Đảm bảo position cho nút absolute
+    preElement.appendChild(button);
+}
+
 // Thêm tin nhắn vào chat (tối ưu: truyền timestamp, render markdown cho bot)
 // Sửa đổi: Thêm isStreaming flag, trả về contentDiv để cập nhật stream.
 function addMessageToChat(message, isUser = false, save = true, customId = null, timestamp = null, isStreaming = false) {
@@ -963,7 +1069,7 @@ async function handleSseStream(apiUrl, requestBody, token, targetContentElement,
                         const jsonData = eventString.substring(5).trim();
                         try {
                             const parsedData = JSON.parse(jsonData);
-                            const chunkText = parsedData.answer || '';
+                            const chunkText = parsedData.chunk || ''; // <<< SỬ DỤNG TRƯỜNG "chunk"
                             const currentConvId = parsedData.conversation_id;
                             const currentMessageId = parsedData.message_id;
 
@@ -996,7 +1102,7 @@ async function handleSseStream(apiUrl, requestBody, token, targetContentElement,
                 const jsonData = buffer.trim().substring(5).trim();
                  try {
                     const parsedData = JSON.parse(jsonData);
-                    const chunkText = parsedData.answer || '';
+                    const chunkText = parsedData.chunk || ''; // <<< SỬ DỤNG TRƯỜNG "chunk"
                     const currentConvId = parsedData.conversation_id;
                     const currentMessageId = parsedData.message_id;
                     if (chunkText) {
