@@ -1,7 +1,7 @@
 // js/login-page.js
-import { handleLogin, handleGoogleLogin } from './login.js'; // Import the necessary functions
+import { handleLogin, handleGoogleVerifyToken } from './login.js'; // Import hàm xác thực token mới
 import { checkAuthentication } from '../chat/auth.js'; // Import checkAuthentication
-import { GOOGLE_CLIENT_ID } from '../chat/config.js'; // Import Google Client ID
+import { GOOGLE_CLIENT_ID } from '../chat/config.js'; // Chỉ import Client ID
 
 // *** Redirect if already logged in ***
 if (checkAuthentication()) {
@@ -9,10 +9,21 @@ if (checkAuthentication()) {
     window.location.href = 'index.html'; // Or your main chat page path
 }
 
-// Hàm callback xử lý khi Google trả về thông tin đăng nhập
+// --- Hàm Callback từ Google Sign-In --- 
 async function handleGoogleCredentialResponse(response) {
-    console.log("[login-page.js] Received Google Credential Response:", response);
+    console.log("[login-page.js] Received Google Credential Response");
     const idToken = response.credential;
+
+    // --- Không cần giải mã idToken ở client nữa ---
+    // let googleID = null;
+    // let email = null;
+    // try {
+    //     // ... code giải mã cũ (KHÔNG AN TOÀN) ...
+    // } catch (decodeError) {
+    //     // ... xử lý lỗi giải mã cũ ...
+    //     return;
+    // }
+    // --- Kết thúc phần giải mã không an toàn ---
 
     // Lấy các element UI để hiển thị trạng thái chờ/lỗi
     const errorMessageDiv = document.getElementById('errorMessage');
@@ -28,8 +39,8 @@ async function handleGoogleCredentialResponse(response) {
     errorMessageDiv.style.display = 'none'; // Ẩn lỗi cũ
     errorTextElement.textContent = '';
 
-    // --- Hiển thị trạng thái chờ (có thể thêm spinner vào div hoặc làm mờ nút) ---
-    console.log("[login-page.js] Setting Google button to loading state.");
+    // --- Hiển thị trạng thái chờ --- 
+    console.log("[login-page.js] Setting Google button div to loading state.");
     googleSignInButtonDiv.style.opacity = '0.6';
     googleSignInButtonDiv.style.pointerEvents = 'none';
     errorTextElement.textContent = 'Đang xác thực với máy chủ...';
@@ -38,34 +49,36 @@ async function handleGoogleCredentialResponse(response) {
     errorMessageDiv.classList.add('text-blue-600'); // Màu xanh thông báo
 
     try {
-        console.log("[login-page.js] Calling handleGoogleLogin from login.js...");
-        const googleLoginResult = await handleGoogleLogin(idToken); // Gọi hàm từ login.js
-        console.log("[login-page.js] handleGoogleLogin result:", googleLoginResult);
+        console.log("[login-page.js] Calling handleGoogleVerifyToken with idToken...");
+        // Gọi hàm trong login.js để gửi idToken về backend
+        const verificationResult = await handleGoogleVerifyToken(idToken);
+        console.log("[login-page.js] handleGoogleVerifyToken result:", verificationResult);
 
-        if (googleLoginResult.success) {
+        if (verificationResult.success) {
             errorMessageDiv.style.display = 'none';
-            console.log("[login-page.js] Google login successful. Redirecting to index.html...");
+            console.log("[login-page.js] Google sign-in successful. Redirecting to index.html...");
             window.location.href = 'index.html'; // Chuyển hướng khi thành công
         } else {
-            // Lỗi từ backend
-            console.error("[login-page.js] Google login failed (backend error):");
-            errorTextElement.textContent = googleLoginResult.message || 'Đăng nhập bằng Google thất bại từ máy chủ.';
+            // Lỗi từ backend (đã xác thực hoặc lỗi khác)
+            console.error("[login-page.js] Google sign-in failed (backend error):");
+            errorTextElement.textContent = verificationResult.message || 'Đăng nhập bằng Google thất bại từ máy chủ.';
             errorMessageDiv.classList.remove('text-blue-600');
             errorMessageDiv.classList.add('text-red-600');
             errorMessageDiv.style.display = 'flex';
         }
     } catch (error) {
-        console.error("[login-page.js] Error during Google login process:", error);
+        // Lỗi mạng hoặc lỗi không mong muốn khi gọi handleGoogleVerifyToken
+        console.error("[login-page.js] Error during Google sign-in process:", error);
         errorTextElement.textContent = 'Lỗi kết nối hoặc xử lý phía máy chủ khi đăng nhập Google.';
         errorMessageDiv.classList.remove('text-blue-600');
         errorMessageDiv.classList.add('text-red-600');
         errorMessageDiv.style.display = 'flex';
     } finally {
-        // --- Khôi phục trạng thái nút Google ---
-        console.log("[login-page.js] Restoring Google button state.");
+        // --- Khôi phục trạng thái nút Google --- 
+        console.log("[login-page.js] Restoring Google button div state.");
         googleSignInButtonDiv.style.opacity = '1';
         googleSignInButtonDiv.style.pointerEvents = 'auto';
-        // Có thể ẩn thông báo chờ nếu không có lỗi
+        // Chỉ ẩn thông báo loading màu xanh, giữ lại nếu có lỗi màu đỏ
         if (errorMessageDiv.classList.contains('text-blue-600')) {
            errorMessageDiv.style.display = 'none';
         }
@@ -83,10 +96,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const buttonText = submitButton ? submitButton.querySelector('.button-text') : null;
     const buttonSpinner = submitButton ? submitButton.querySelector('.button-spinner') : null;
 
-    // Lấy div chứa nút Google (thay vì nút cũ)
+    // Lấy div chứa nút Google (theo cập nhật html)
     const googleSignInButtonDiv = document.getElementById('googleSignInButtonDiv');
 
-    // Check for necessary elements (bỏ các element của nút Google cũ, thêm div mới)
+    // Check for necessary elements
     if (!loginForm || !emailInput || !passwordInput || !errorMessageDiv || !errorTextElement || !submitButton || !buttonText || !buttonSpinner || !googleSignInButtonDiv) {
         console.error("[login-page.js] Login page UI elements not found. Initialization failed.");
         if (errorTextElement && errorMessageDiv) {
@@ -97,21 +110,37 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     console.log("[login-page.js] All required UI elements found.");
 
-    // Đảm bảo hàm handleLogin và handleGoogleLogin đã được tải
-    if (typeof handleLogin !== 'function' || typeof handleGoogleLogin !== 'function') {
-        console.error("[login-page.js] CRITICAL ERROR: handleLogin() or handleGoogleLogin() not found.");
+    // Đảm bảo hàm handleLogin và handleGoogleVerifyToken đã được tải
+    if (typeof handleLogin !== 'function' || typeof handleGoogleVerifyToken !== 'function') { // Kiểm tra hàm mới
+        console.error("[login-page.js] CRITICAL ERROR: handleLogin() or handleGoogleVerifyToken() not found."); // Cập nhật thông báo lỗi
         errorTextElement.textContent = 'Lỗi tải chức năng đăng nhập. Vui lòng thử lại.';
         errorMessageDiv.style.display = 'flex';
         submitButton.disabled = true;
         // Không cần disable nút Google vì nó được quản lý bởi thư viện
         return;
     }
-    console.log("[login-page.js] handleLogin and handleGoogleLogin functions are available.");
+    console.log("[login-page.js] handleLogin and handleGoogleVerifyToken functions are available.");
 
     // --- Khởi tạo Google Sign In --- 
-    // Đợi thư viện Google tải xong
+    // Đặt trong window.onload để đảm bảo thư viện gsi đã tải xong và GOOGLE_CLIENT_ID đã sẵn sàng
     window.onload = function () {
       console.log("[login-page.js] window.onload event fired, initializing Google Sign-In...");
+      if (typeof google === 'undefined' || !google.accounts || !google.accounts.id) {
+          console.error("[login-page.js] Google Identity Services library (gsi) not loaded.");
+          if (errorTextElement && errorMessageDiv) {
+              errorTextElement.textContent = 'Không thể tải thư viện đăng nhập Google. Vui lòng kiểm tra kết nối mạng hoặc thử lại.';
+              errorMessageDiv.style.display = 'flex';
+          }
+          return;
+      }
+      if (!GOOGLE_CLIENT_ID) {
+          console.error("[login-page.js] GOOGLE_CLIENT_ID is not defined or imported.");
+          if (errorTextElement && errorMessageDiv) {
+              errorTextElement.textContent = 'Lỗi cấu hình phía client (Client ID).';
+              errorMessageDiv.style.display = 'flex';
+          }
+          return;
+      }
       try {
         google.accounts.id.initialize({
           client_id: GOOGLE_CLIENT_ID, 
@@ -130,12 +159,14 @@ document.addEventListener('DOMContentLoaded', () => {
         // google.accounts.id.prompt(); 
       } catch (error) {
           console.error("[login-page.js] Error initializing Google Sign-In:", error);
-          errorTextElement.textContent = 'Không thể khởi tạo đăng nhập Google. Vui lòng tải lại trang.';
-          errorMessageDiv.style.display = 'flex';
+          if (errorTextElement && errorMessageDiv) {
+             errorTextElement.textContent = 'Không thể khởi tạo đăng nhập Google. Vui lòng tải lại trang hoặc kiểm tra cấu hình console.';
+             errorMessageDiv.style.display = 'flex';
+          }
       }
     };
 
-    // --- Xử lý Submit Form Email/Password (giữ nguyên) --- 
+    // --- Xử lý Submit Form Email/Password (giữ nguyên logic cũ) --- 
     loginForm.addEventListener('submit', async function(event) {
         console.log("[login-page.js] Login form submitted.");
         event.preventDefault();

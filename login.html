@@ -71,7 +71,7 @@
           </div>
 
           <div>
-            <!-- Thay thế button bằng div để Google render nút -->
+            <!-- Div này sẽ chứa nút Google Sign-In được render bởi thư viện -->
             <div id="googleSignInButtonDiv" class="flex justify-center"></div>
           </div>
 
@@ -85,5 +85,7 @@
     </div>
 
     <script type="module" src="js/login/login-page.js"></script>
+    <!-- Cần GOOGLE_CLIENT_ID được định nghĩa trước khi login-page.js chạy nếu không dùng import/export -->
+    <!-- Hoặc đảm bảo login-page.js import GOOGLE_CLIENT_ID từ config.js -->
 </body>
 </html>
