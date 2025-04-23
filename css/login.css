@@ -1,0 +1,16 @@
+/* Thêm keyframes cho animation fade-in */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in {
+    animation: fadeIn 0.5s ease-out forwards;
+}
+
+/* Icon color for inputs */
+.input-icon {
+    color: #9ca3af; /* gray-400 */
+}
+input:focus + .input-icon {
+     color: #b42c1c; /* primary-600 */
+} 
