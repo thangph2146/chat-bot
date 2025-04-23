@@ -4,19 +4,6 @@ import { fetchWithAuth } from '../chat/api.js'; // Correct path: Go up one level
 import { showNotification } from '../chat/ui.js'; // Import showNotification for consistency
 
 /**
- * Kiểm tra trạng thái đăng nhập của người dùng dựa trên dữ liệu từ API login.
- * Giả sử lưu token hoặc thông tin user từ API vào localStorage với key 'hub_user_data'.
- * @returns {boolean} True nếu đã đăng nhập, false nếu chưa.
- */
-function checkLoginStatus() {
-    console.log('[login.js] Checking login status...');
-    const apiUserInfo = localStorage.getItem('hub_user_data'); // <-- Use consistent key
-    const isLoggedIn = apiUserInfo !== null;
-    console.log(`[login.js] Login status (hub_user_data exists): ${isLoggedIn}`);
-    return isLoggedIn;
-}
-
-/**
  * Gửi yêu cầu đăng nhập đến API.
  * @param {string} email
  * @param {string} password
@@ -59,102 +46,11 @@ export async function handleLogin(email, password) {
     } catch (error) {
         // fetchWithAuth đã log lỗi chi tiết
         console.error('[login.js] Login failed:', error);
-        localStorage.removeItem(USER_DATA_KEY); // Đảm bảo xóa dữ liệu không hợp lệ
+        // Không cần xóa localStorage ở đây vì fetchWithAuth đã xử lý 401
+        // localStorage.removeItem(USER_DATA_KEY);
         // Trả về message từ lỗi đã được chuẩn hóa bởi fetchWithAuth hoặc lỗi mạng
         return { success: false, message: error.message || 'Lỗi kết nối hoặc xử lý phía máy chủ.' };
     }
-}
-
-/**
- * Xử lý đăng xuất.
- * Xóa thông tin người dùng từ API đã lưu.
- */
-export function handleLogout() {
-    try {
-        console.log('[login.js] Logging out user...');
-        localStorage.removeItem(USER_DATA_KEY);
-        console.log('[login.js] User data removed from localStorage.');
-        window.location.href = '/'; // Chuyển về trang gốc
-        // window.location.reload(); // Reload không cần thiết khi đã chuyển trang
-    } catch (e) {
-        console.error('[login.js] Error during logout:', e);
-        // Hiển thị lỗi cho người dùng nếu cần
-        showNotification('Lỗi xảy ra trong quá trình đăng xuất.', 'error');
-    }
-}
-
-/**
- * Lấy thông tin người dùng đã đăng nhập từ API (đã lưu).
- * @returns {object | null} Đối tượng chứa thông tin người dùng từ API hoặc null.
- */
-function getUserInfo() {
-    try {
-        const userInfoString = localStorage.getItem('hub_user_data'); // Use consistent key
-        if (userInfoString) {
-            console.log('[login.js] Retrieved raw user info string:', userInfoString);
-            const parsedInfo = JSON.parse(userInfoString);
-            console.log('[login.js] Parsed user info:', parsedInfo);
-            return parsedInfo;
-        } else {
-            console.log('[login.js] No user info found in localStorage for hub_user_data.');
-        }
-    } catch (e) {
-        console.error('[login.js] Error parsing stored user info:', e);
-        localStorage.removeItem('hub_user_data'); // Clear corrupted data
-    }
-    return null;
-}
-
-/**
- * Hàm kiểm tra xác thực tổng quát, gọi checkLoginStatus.
- * @returns {boolean} True nếu đã xác thực, false nếu chưa.
- */
-function checkAuthentication() {
-    console.log('[login.js] checkAuthentication called...');
-    const isLoggedIn = checkLoginStatus();
-    if (!isLoggedIn) {
-        console.log('[login.js] User is NOT logged in. Redirecting if not on login/register page.');
-        const currentPath = window.location.pathname.toLowerCase();
-        if (currentPath !== '/login.html' && currentPath !== '/' && currentPath !== '/register.html') { // Allow root path as well
-            console.log(`[login.js] Redirecting from ${currentPath} to login.html`);
-            window.location.href = 'login.html'; // Adjust if base path is different
-        }
-    } else {
-        console.log('[login.js] User is logged in.');
-    }
-    return isLoggedIn;
-}
-
-/**
- * Hiển thị thông tin người dùng trên giao diện dựa trên dữ liệu từ API.
- * Giả sử API trả về { data: { fullName: '...', email: '...' } }.
- */
-function displayUserInfo() {
-    console.log('[login.js] Attempting to display user info on UI...');
-    const userInfo = getUserInfo(); // Gets the { data: { ... } } structure
-    const userInfoDisplay = document.getElementById('userInfoDisplay');
-    const logoutButton = document.getElementById('logoutButton');
-
-    if (userInfo && userInfo.data && userInfoDisplay) { // Check nested data object
-        const displayName = userInfo.data.fullName || userInfo.data.email || 'User';
-        console.log(`[login.js] Displaying user info: ${displayName}`);
-        userInfoDisplay.textContent = `Chào, ${displayName}!`;
-        if (logoutButton) {
-            logoutButton.style.display = 'inline-flex';
-        }
-    } else if (userInfoDisplay) {
-        console.log('[login.js] No valid user info found to display.');
-        userInfoDisplay.textContent = '';
-        if (logoutButton) {
-            logoutButton.style.display = 'none';
-        }
-    }
-}
-
-// Hàm xử lý đăng xuất (để gắn vào nút)
-function handleUserLogout() {
-    console.log('[login.js] handleUserLogout (for button) called.');
-    handleLogout();
 }
 
 /**
@@ -203,7 +99,8 @@ export async function handleGoogleVerifyToken(idToken) {
     } catch (error) {
         // Lỗi mạng hoặc lỗi từ fetchWithAuth
         console.error('[login.js] Error sending idToken to backend:', error);
-        localStorage.removeItem(USER_DATA_KEY); // Xóa session cũ nếu có lỗi
+        // Không cần xóa localStorage ở đây vì fetchWithAuth đã xử lý 401
+        // localStorage.removeItem(USER_DATA_KEY);
         // Trả về message từ lỗi đã được chuẩn hóa bởi fetchWithAuth hoặc lỗi mạng
         return { success: false, message: error.message || 'Lỗi kết nối đến máy chủ xác thực.' };
     }

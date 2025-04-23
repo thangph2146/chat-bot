@@ -54,33 +54,44 @@ export function isLocalStorageAvailable() {
  * @returns {string} Chuỗi HTML đã được render và sanitize.
  */
 export function renderMarkdown(text) {
+    // Kiểm tra xem thư viện Marked có sẵn không
     if (typeof marked === 'undefined') {
         console.error('Thư viện MarkedJS chưa được tải.');
+        // Fallback: Trả về text đã được escape cơ bản để tránh XSS đơn giản
         const escapedText = document.createElement('textarea');
         escapedText.textContent = text;
-        return escapedText.innerHTML.replace(/\n/g, '<br>');
+        return escapedText.innerHTML.replace(/\n/g, '<br>'); // Thay newline bằng <br>
     }
     try {
+        // Cấu hình Marked (nên thực hiện một lần ở nơi khác nếu có thể)
         marked.setOptions({
-            gfm: true,
-            breaks: true,
-            sanitize: false,
-            smartypants: false
+            gfm: true,      // Hỗ trợ GitHub Flavored Markdown (bảng, etc.)
+            breaks: true,   // Chuyển đổi \n thành <br>
+            sanitize: false, // TẮT trình sanitize của Marked (lỗi thời và không an toàn)
+                            // Chúng ta sẽ sử dụng DOMPurify để thay thế.
+            smartypants: false // Không chuyển đổi dấu ngoặc kép, etc.
         });
 
+        // Bước 1: Parse Markdown thành HTML thô
         const rawHtml = marked.parse(text);
 
+        // Bước 2: Sanitize HTML bằng DOMPurify (nếu có)
+        // Đây là bước QUAN TRỌNG để chống XSS
         if (typeof DOMPurify === 'undefined') {
-            console.warn('Thư viện DOMPurify chưa được tải. HTML sẽ không được sanitize.');
-            return rawHtml;
+            console.warn('Thư viện DOMPurify chưa được tải. HTML sẽ không được sanitize - Nguy cơ XSS!');
+            return rawHtml; // Trả về HTML thô nếu không có DOMPurify
         } else {
-            return DOMPurify.sanitize(rawHtml, {
-                USE_PROFILES: { html: true },
-                ADD_ATTR: ['target'],
+            // Cấu hình DOMPurify (có thể tùy chỉnh thêm)
+            const cleanHtml = DOMPurify.sanitize(rawHtml, {
+                USE_PROFILES: { html: true }, // Cho phép các thẻ HTML an toàn cơ bản
+                ADD_ATTR: ['target'],          // Cho phép thuộc tính target (cho link _blank)
+                // ADD_TAGS: [], // Thêm các thẻ tùy chỉnh nếu cần
             });
+            return cleanHtml;
         }
     } catch (error) {
         console.error('Lỗi khi render Markdown:', error);
+        // Fallback an toàn trong trường hợp lỗi parse
         const escapedText = document.createElement('textarea');
         escapedText.textContent = text;
         return escapedText.innerHTML.replace(/\n/g, '<br>');
@@ -146,7 +157,6 @@ export function highlightCodeBlocks(containerElement) {
                  if (!block.classList.contains('hljs') && !block.dataset.highlighted) {
                     hljs.highlightElement(block);
                     block.dataset.highlighted = 'true';
-                    addCopyButton(block.parentNode);
                 }
             } catch (error) {
                 console.error('Lỗi khi highlight code block:', error, block.textContent);

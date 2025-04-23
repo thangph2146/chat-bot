@@ -133,7 +133,25 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                 // Registration failed
                 console.error("[register-page.js] Registration failed:");
-                errorTextElement.textContent = registrationResult.message || 'Đăng ký không thành công. Vui lòng thử lại.';
+
+                // Cố gắng lấy thông báo lỗi cụ thể từ API
+                let displayMessage = 'Đăng ký không thành công. Vui lòng thử lại.'; // Mặc định
+                if (registrationResult.message) {
+                    try {
+                        // Tìm chuỗi JSON trong thông báo lỗi từ api.js
+                        const jsonStringMatch = registrationResult.message.match(/{.*}/);
+                        if (jsonStringMatch && jsonStringMatch[0]) {
+                            const errorData = JSON.parse(jsonStringMatch[0]);
+                            if (errorData && errorData.message) {
+                                displayMessage = errorData.message;
+                            } else {
+                                // Nếu không có message trong JSON, dùng message gốc (đã cắt bỏ phần thừa)
+                                displayMessage = registrationResult.message.split(', message: {')[1].split('}')[0];
+                            }
+                        }
+                    } catch (e) { /* Ignore */ }
+                }
+                errorTextElement.textContent = displayMessage;
                 errorMessageDiv.style.display = 'flex';
                 if (registrationResult.message && registrationResult.message.toLowerCase().includes('email')) {
                     emailInput.select();
