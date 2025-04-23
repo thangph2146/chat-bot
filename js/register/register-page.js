@@ -1,4 +1,4 @@
-import { handleRegister } from './register.js';
+﻿import { handleRegister } from './register.js';
 import { checkAuthentication } from '../chat/auth.js';
 
 // *** Redirect if already logged in ***

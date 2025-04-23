@@ -1,8 +1,7 @@
-import {
+﻿import {
     checkAuthentication,
     displayUserInfo,
     handleUserLogout,
-    getUserInfo
 } from './auth.js';
 import {
     loadChatSessions,
@@ -28,7 +27,6 @@ import {
 
 // Main application entry point
 document.addEventListener('DOMContentLoaded', async () => {
-    console.log('[main.js] DOM fully loaded. Initializing...');
 
     // --- START: Gather DOM Elements ---
     const domElements = {
@@ -45,47 +43,37 @@ document.addEventListener('DOMContentLoaded', async () => {
         userInfoDisplay: document.getElementById('userInfoDisplay') // Added for displayUserInfo
         // Add any other frequently used elements here
     };
-    console.log('[main.js] Collected DOM elements:', domElements);
     // --- END: Gather DOM Elements ---
 
     // 1. Auth Check (Crucial for protecting the page)
-    console.log('[main.js] ---> Calling checkAuthentication...');
     const isAuthenticated = checkAuthentication(); // From auth.js
-    console.log(`[main.js] <--- checkAuthentication result: ${isAuthenticated}`);
 
     if (!isAuthenticated) {
-        console.log('[main.js] Auth check FAILED. Redirecting to login page immediately.');
         // *** Immediate Redirect ***
         window.location.href = 'login.html'; // Adjust path if needed
         return; // Stop further execution of main.js
     }
-    console.log('[main.js] Auth check PASSED.');
 
     // 2. Get DOM Elements (Now using the domElements object)
     // Example: const sendButton = domElements.sendButton; (no longer needed here if passed directly)
 
     // 3. Initial UI Setup
-    console.log('[main.js] Performing initial UI setup...');
     // Pass necessary elements to displayUserInfo (from auth.js, needs update there too potentially, or adapt here)
     displayUserInfo(); // Keep as is for now, assuming it finds its own elements
     // Pass necessary elements to initSpeechRecognition
     initSpeechRecognition(domElements.messageInput, domElements.recordButton);
     setShowWelcomeMessageHandler(showWelcomeMessage); // Inject callback
-    console.log('[main.js] Initial UI setup complete.');
 
     // 4. Load Initial Session Data (Fetch & Process Only)
-    console.log('[main.js] ---> Calling loadChatSessions...');
     // Pass the entire domElements object now
     const loadSuccess = await loadChatSessions(domElements); // Pass the whole object
-    console.log(`[main.js] <--- loadChatSessions completed. Success: ${loadSuccess}`);
 
     // 5. Update UI Based on Load Result
     if (loadSuccess) {
         const sessions = getAllSessions();
         const initialSessionId = getCurrentSessionId();
-        console.log(`[main.js] Load successful. Sessions count: ${sessions?.length}, Initial Session ID: ${initialSessionId}`);
 
-        // Luôn cập nhật sidebar trước
+        // LuÃ´n cáº­p nháº­t sidebar trÆ°á»›c
         // Pass historySessions element to updateHistorySidebar
         updateHistorySidebar(
             sessions, 
@@ -93,27 +81,23 @@ document.addEventListener('DOMContentLoaded', async () => {
             handleSelectSession, 
             handleDeleteRequest, 
             domElements.historySessions, // historySessionsElement
-            domElements.chatContainer,    // chatContainerElement (Thêm)
-            domElements.welcomeMessageDiv,// welcomeElement (Thêm)
-            domElements.chatMessagesDiv   // chatMessagesElement (Thêm)
+            domElements.chatContainer,    // chatContainerElement (ThÃªm)
+            domElements.welcomeMessageDiv,// welcomeElement (ThÃªm)
+            domElements.chatMessagesDiv   // chatMessagesElement (ThÃªm)
         );
-        console.log('[main.js] History sidebar updated.');
 
         if (initialSessionId) {
-            // Nếu có session ban đầu, tải tin nhắn cho nó
-            console.log(`[main.js] ---> Calling loadSessionMessages for initial session: ${initialSessionId}`);
+            // Náº¿u cÃ³ session ban Ä‘áº§u, táº£i tin nháº¯n cho nÃ³
             // Pass ALL required elements to loadSessionMessages
             await loadSessionMessages(
                 initialSessionId,
-                domElements.historySessions,    // <<< Thêm historySessions
-                domElements.chatContainer,      // <<< Đã có
-                domElements.welcomeMessageDiv,  // <<< Thêm welcomeMessageDiv
-                domElements.chatMessagesDiv     // <<< Thêm chatMessagesDiv
+                domElements.historySessions,    // <<< ThÃªm historySessions
+                domElements.chatContainer,      // <<< ÄÃ£ cÃ³
+                domElements.welcomeMessageDiv,  // <<< ThÃªm welcomeMessageDiv
+                domElements.chatMessagesDiv     // <<< ThÃªm chatMessagesDiv
             );
-            console.log(`[main.js] <--- loadSessionMessages for initial session finished.`);
         } else {
-            // Nếu không có session nào (loadChatSessions đã gọi startNewChat)
-            console.log('[main.js] No initial session ID found. startNewChat should have handled UI.');
+            // Náº¿u khÃ´ng cÃ³ session nÃ o (loadChatSessions Ä‘Ã£ gá»i startNewChat)
              // startNewChat will need to receive elements too if it calls loadSessionUI
              // Need to trace how showWelcomeMessage is ultimately called and ensure elements are passed down
         }
@@ -121,16 +105,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         console.error('[main.js] Failed to load initial chat sessions. Check logs from session.js.');
         // Update sidebar to show error state if not already done by session.js
         if (domElements.historySessions && !domElements.historySessions.querySelector('.text-red-500')) {
-             domElements.historySessions.innerHTML = '<p class="text-center text-red-500 text-sm p-4">Lỗi tải lịch sử.</p>';
+             domElements.historySessions.innerHTML = '<p class="text-center text-red-500 text-sm p-4">Lá»—i táº£i lá»‹ch sá»­.</p>';
         }
         // Optionally show an error message in the chat area if needed
         if (domElements.chatContainer) {
-            domElements.chatContainer.innerHTML = '<p class="text-center text-red-500 text-sm p-4">Không thể tải dữ liệu. Vui lòng thử lại.</p>';
+            domElements.chatContainer.innerHTML = '<p class="text-center text-red-500 text-sm p-4">KhÃ´ng thá»ƒ táº£i dá»¯ liá»‡u. Vui lÃ²ng thá»­ láº¡i.</p>';
         }
     }
 
     // 6. Attach Event Listeners (Now that initial state is potentially set)
-    console.log('[main.js] Attaching event listeners...');
     // Send message listeners
     if (domElements.sendButton) {
         // Pass necessary elements to handleSendMessage
@@ -161,7 +144,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 domElements.messageInput.classList.remove('border-primary-400', 'ring-1', 'ring-primary-200');
             }, 300);
         });
-        console.log('[main.js] Added input effect listener to messageInput.');
     } else {
         console.warn('Message input not found');
     }
@@ -194,5 +176,4 @@ document.addEventListener('DOMContentLoaded', async () => {
         console.warn('Logout button not found');
     }
 
-    console.log('[main.js] Initialization complete.');
-}); 
+});

@@ -1,12 +1,10 @@
-document.addEventListener('DOMContentLoaded', () => {
-    console.log('[ui-interactions.js] DOMContentLoaded fired. Initializing UI interactions...');
+﻿document.addEventListener('DOMContentLoaded', () => {
 
     // --- Ripple Effect ---
     try {
         const rippleButtons = document.querySelectorAll(
             '#clearHistoryButton, #newChatButton, #recordButton, #sendButton, #toggleHistoryButton, #historyBubbleButton, #logoutButton, #newChatButtonSidebar, #closeHistorySidebar'
         );
-        console.log(`[ui-interactions.js] Found ${rippleButtons.length} buttons for ripple effect.`);
 
         rippleButtons.forEach(button => {
             button.addEventListener('click', function(e) {
@@ -31,7 +29,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 }, 600); // Match animation duration in chat-styles.css
             });
         });
-        console.log('[ui-interactions.js] Ripple effect listeners added successfully.');
     } catch (error) {
         console.error('[ui-interactions.js] Error setting up ripple effect:', error);
     }
@@ -46,16 +43,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Only proceed if essential elements are found
         if (historyBubbleButton && closeHistorySidebar && chatHistorySidebar && mobileHistoryOverlay) {
-            console.log('[ui-interactions.js] Mobile history sidebar elements found. Setting up listeners...');
 
             const toggleBodyScroll = (isOpen) => {
                 document.body.classList.toggle('sidebar-open', isOpen);
-                console.log(`[ui-interactions.js] Body scroll class 'sidebar-open' ${isOpen ? 'added' : 'removed'}.`);
             };
 
             const openHistorySidebar = () => {
                 if (window.innerWidth < 768) {
-                    console.log('[ui-interactions.js] Opening mobile history sidebar...');
                     chatHistorySidebar.classList.remove('hidden');
                     requestAnimationFrame(() => {
                         chatHistorySidebar.classList.remove('translate-x-full');
@@ -69,7 +63,6 @@ document.addEventListener('DOMContentLoaded', () => {
             };
 
             const closeHistorySidebarHandler = () => {
-                console.log('[ui-interactions.js] Closing mobile history sidebar...');
                 mobileHistoryOverlay.classList.add('opacity-0');
                 chatHistorySidebar.classList.add('translate-x-full');
                 setTimeout(() => {
@@ -86,7 +79,6 @@ document.addEventListener('DOMContentLoaded', () => {
             if (toggleHistoryHeaderButton) {
                 toggleHistoryHeaderButton.addEventListener('click', openHistorySidebar);
             } else {
-                console.log('[ui-interactions.js] Header toggle button (#toggleHistoryButton) not found, listener not added.');
             }
             closeHistorySidebar.addEventListener('click', closeHistorySidebarHandler);
             mobileHistoryOverlay.addEventListener('click', closeHistorySidebarHandler);
@@ -104,7 +96,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 }
             });
-            console.log('[ui-interactions.js] Mobile history sidebar listeners and resize handler added.');
         } else {
             console.warn('[ui-interactions.js] One or more essential mobile history sidebar elements not found. Skipping sidebar setup.');
         }
@@ -112,5 +103,4 @@ document.addEventListener('DOMContentLoaded', () => {
         console.error('[ui-interactions.js] Error setting up mobile history sidebar:', error);
     }
 
-    console.log('[ui-interactions.js] UI interactions setup finished.');
-}); 
+});

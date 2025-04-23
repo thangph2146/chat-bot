@@ -1,4 +1,4 @@
-import { SESSIONS_API_ENDPOINT, CHAT_MESSAGE_API_ENDPOINT } from './config.js';
+﻿import { SESSIONS_API_ENDPOINT, CHAT_MESSAGE_API_ENDPOINT } from './config.js';
 import { generateUniqueId, renderMessageElement } from './utils.js';
 import { showNotification, updateHistorySidebar, loadSessionUI, showDeleteSessionDialog } from './ui.js';
 import { getUserInfo } from './auth.js'; // Assuming auth.js provides getUserInfo
@@ -70,12 +70,33 @@ export function addMessageToCurrentSession(messageData, domElements) {
          // Avoid duplicates if message has an ID
          if (!messageData.id || !session.messages.some(m => m.id === messageData.id)) {
              session.messages.push(messageData);
-             session.lastUpdatedAt = new Date().toISOString(); // Update timestamp
-             console.log('[session.js] Added message, updating sidebar.');
-             // No need to save cache here
-             // Update sidebar to reflect new timestamp/activity
-             // Pass extracted elements
-             updateHistorySidebar(chatSessions, currentSessionId, handleSelectSession, handleDeleteRequest, historySessionsElement, chatContainerElement, welcomeElement, chatMessagesElement);
+             // Cập nhật lastUpdatedAt ngay sau khi push
+             session.lastUpdatedAt = new Date().toISOString(); 
+
+             let titleUpdated = false;
+             // --- Cập nhật title CHỈ KHI tin nhắn là của người dùng --- 
+             if (messageData.isUser) {
+                 const userContent = messageData.content?.trim() || '';
+                 if (userContent) { 
+                     const newTitle = userContent.length > 30 
+                                      ? userContent.substring(0, 27) + '...' 
+                                      : userContent;
+                     if (newTitle !== session.title) {
+                        // Gọi hàm riêng để cập nhật title (cả client và server)
+                        updateCurrentSessionTitle(newTitle, domElements);
+                        titleUpdated = true; // Đánh dấu title đã được cập nhật (và sidebar sẽ được gọi bên trong updateCurrentSessionTitle)
+                        // Không gọi updateHistorySidebar trực tiếp ở đây nữa
+                     }
+                 }
+             }
+             // ---------------------------------------------------------
+
+             // Chỉ gọi updateHistorySidebar nếu title KHÔNG được cập nhật 
+             // (vì updateCurrentSessionTitle đã gọi nó rồi)
+             if (!titleUpdated) {
+                 console.log('[session.js] Added message (no title change), updating sidebar.');
+                 updateHistorySidebar(chatSessions, currentSessionId, handleSelectSession, handleDeleteRequest, historySessionsElement, chatContainerElement, welcomeElement, chatMessagesElement);
+             }
          }
      } else {
          console.warn("[session.js] Cannot add message: No current session selected.");
@@ -87,28 +108,35 @@ export function addMessageToCurrentSession(messageData, domElements) {
  * @param {string} newTitle - Tiêu đề mới.
  * @param {object} domElements - Object containing references to key DOM elements.
  */
- export function updateCurrentSessionTitle(newTitle, domElements) {
+export async function updateCurrentSessionTitle(newTitle, domElements) {
     // Extract elements
     const historySessionsElement = domElements?.historySessions;
     const chatContainerElement = domElements?.chatContainer;
     const welcomeElement = domElements?.welcomeMessageDiv;
     const chatMessagesElement = domElements?.chatMessagesDiv;
 
-    // Check history element before calling updateHistorySidebar
     if (!historySessionsElement) {
         console.error('[session.js] updateCurrentSessionTitle: Missing historySessions element.');
     }
 
     const session = getCurrentSession();
-    if (session) {
-        session.title = newTitle;
-        session.lastUpdatedAt = new Date().toISOString();
-        console.log('[session.js] Updated session title, updating sidebar.');
-        // Pass extracted elements
-        updateHistorySidebar(chatSessions, currentSessionId, handleSelectSession, handleDeleteRequest, historySessionsElement, chatContainerElement, welcomeElement, chatMessagesElement);
-        // TODO: Add API call to update title on server if needed
-        // await updateSessionTitleOnServer(currentSessionId, newTitle);
+    const sessionId = session?.id; 
+
+    if (!session || !sessionId) {
+        console.warn('[session.js] Cannot update title: Session or Session ID not found.');
+        return; // Exit if no session
     }
+
+    // --- Cập nhật Client-side state --- 
+    const oldTitle = session.title; // Lưu lại title cũ phòng trường hợp API lỗi và muốn hoàn tác
+    session.title = newTitle;
+    session.lastUpdatedAt = new Date().toISOString();
+    console.log(`[session.js] Client session title updated to: "${newTitle}"`);
+
+    // --- Cập nhật UI (Sidebar) ngay lập tức --- 
+    console.log('[session.js] Updating sidebar UI immediately...');
+    updateHistorySidebar(chatSessions, sessionId, handleSelectSession, handleDeleteRequest, historySessionsElement, chatContainerElement, welcomeElement, chatMessagesElement);
+   
 }
 
 /**
@@ -353,6 +381,38 @@ export async function loadSessionMessages(sessionId, historySessionsElement, cha
                 console.log(`[session.js] Initial load returned fewer messages than requested (${mappedMessages.length}/${initialMessagesCount}). Setting hasMoreOlder=false.`);
             }
 
+            // --- START: Kiểm tra và cập nhật title dựa trên tin nhắn người dùng mới nhất ---
+            let lastUserMessage = null;
+            for (let i = mappedMessages.length - 1; i >= 0; i--) {
+                if (mappedMessages[i].isUser) {
+                    lastUserMessage = mappedMessages[i];
+                    break;
+                }
+            }
+
+            if (lastUserMessage) {
+                const userContent = lastUserMessage.content?.trim() || '';
+                if (userContent) {
+                    const potentialNewTitle = userContent.length > 30
+                                              ? userContent.substring(0, 27) + '...'
+                                              : userContent;
+                    if (potentialNewTitle !== targetSession.title) {
+                        console.log(`[session.js] loadSessionMessages: Found newer title (\"${potentialNewTitle}\") from last user message than current session title (\"${targetSession.title}\"). Updating...`);
+                        // Tạo object domElements tạm thời nếu cần
+                         const tempDomElements = {
+                             historySessions: historySessionsElement,
+                             chatContainer: chatContainerElement,
+                             welcomeMessageDiv: welcomeElement,
+                             chatMessagesDiv: chatMessagesElement
+                         };
+                        // Gọi hàm cập nhật (sẽ cập nhật client state, UI, và gửi API)
+                        // Dùng await để đảm bảo title được cập nhật trước khi load UI? Có thể không cần thiết vì updateCurrentSessionTitle cập nhật UI ngay.
+                        // Tạm thời không await để tránh block
+                        updateCurrentSessionTitle(potentialNewTitle, tempDomElements); 
+                    }
+                }
+            }
+            // --- END: Kiểm tra và cập nhật title ---
 
             console.log(`[session.js] Processed ${targetSession.messages.length} initial messages for ${sessionId}.`);
         } catch (mapSortError) {
@@ -645,10 +705,34 @@ export async function startNewChat(domElements) {
         chatSessions.sort((a, b) => new Date(b.lastUpdatedAt).getTime() - new Date(a.lastUpdatedAt).getTime());
         // Truyền historySessionsElement và các element khác vào updateHistorySidebar
         updateHistorySidebar(chatSessions, currentSessionId, handleSelectSession, handleDeleteRequest, historySessionsElement, chatContainerElement, welcomeElement, chatMessagesElement);
-        // Pass the full domElements object to loadSessionUI
-        loadSessionUI(newSession, showWelcomeMessageHandler, domElements);
-         // No scroll listener needed for a brand new chat initially
-         console.log(`[session.js] Not adding scroll listener for new chat ${currentSessionId}`);
+        // 1. Load (clear) the UI first
+        loadSessionUI(newSession, null, domElements); // Pass null for showWelcomeFn as we handle it below
+
+        // 2. THEN, trigger the dynamic welcome message generation
+        if (showWelcomeMessageHandler) {
+            console.log('[session.js] Calling showWelcomeMessageHandler AFTER loadSessionUI to display dynamic welcome message in chat area.');
+            // Use try-catch as showWelcomeMessageHandler is async and might throw
+            try {
+                // No need to await if we don't need to wait for it to finish before proceeding
+                showWelcomeMessageHandler(domElements); 
+            } catch (welcomeError) {
+                console.error('[session.js] Error calling showWelcomeMessageHandler:', welcomeError);
+                // Optionally show an error message in the chat area
+                if(chatContainerElement) {
+                    chatContainerElement.innerHTML = '<p class="text-center text-red-500 p-4">Lỗi khi hiển thị tin nhắn chào mừng.</p>';
+                }
+            }
+        } else {
+            console.warn('[session.js] showWelcomeMessageHandler not set. Cannot display dynamic welcome message.');
+            // UI is already cleared by loadSessionUI, maybe show a static text?
+            if(chatContainerElement) {
+                 chatContainerElement.innerHTML = '<p class="text-center text-secondary-500 p-4">Bắt đầu cuộc trò chuyện mới.</p>';
+            }
+        }
+
+        // No scroll listener needed for a brand new chat initially
+        console.log(`[session.js] Not adding scroll listener for new chat ${currentSessionId}`);
+
     } catch (error) {
         console.error('[session.js] Error creating new chat:', error);
          if (!error.message.includes('401')) {

@@ -1,4 +1,4 @@
-// js/login-page.js
+﻿// js/login-page.js
 import { handleLogin, handleGoogleVerifyToken } from './login.js'; // Import hàm xác thực token mới
 import { checkAuthentication } from '../chat/auth.js'; // Import checkAuthentication
 import { GOOGLE_CLIENT_ID } from '../chat/config.js'; // Chỉ import Client ID

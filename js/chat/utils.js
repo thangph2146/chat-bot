@@ -1,3 +1,5 @@
+﻿import { getUserInfo } from './auth.js'; // Thêm import
+
 /**
  * Hàm tiện ích tạo ID ngẫu nhiên đơn giản.
  * @returns {string} ID ngẫu nhiên dựa trên thời gian và số ngẫu nhiên.
@@ -167,54 +169,96 @@ export function highlightCodeBlocks(containerElement) {
 
 /**
  * Tạo phần tử DOM cho một tin nhắn.
- * @param {object} msg - Dữ liệu tin nhắn (ví dụ: { id, content, isUser, timestamp, senderName }).
- * @returns {HTMLElement} Phần tử DOM của tin nhắn.
+ * @param {object} msg - Dữ liệu tin nhắn (ví dụ: { id, content, isUser, timestamp, senderName, isStreaming }).
+ * @returns {HTMLElement | null} Phần tử DOM của tin nhắn hoặc null nếu lỗi.
  */
 export function renderMessageElement(msg) {
-    const messageElement = document.createElement('div');
-    // Container chính cho mỗi tin nhắn, sử dụng flex để căn chỉnh
-    messageElement.classList.add('message-item', 'mb-4', 'flex', 'flex-col');
-    messageElement.dataset.messageId = msg.id;
+    if (!msg || typeof msg.id === 'undefined') {
+        console.error('[utils.js] renderMessageElement: Invalid msg object received:', msg);
+        return null;
+    }
 
+    const messageContainer = document.createElement('div');
+    messageContainer.classList.add('message-row', 'mb-4', 'flex', 'items-start', 'gap-3', 'animate-fade-in'); // Thêm fade-in
+    messageContainer.dataset.messageId = msg.id;
+
+    // 1. Avatar
+    const avatarElement = document.createElement('div');
+    avatarElement.classList.add(
+        'flex-shrink-0', 'w-8', 'h-8', 'rounded-full', 'flex', 'items-center', 'justify-center',
+        'text-sm', 'font-semibold', 'mt-1'
+    );
+
+    // 2. Khối nội dung (Tên + Bubble)
+    const mainContentBlock = document.createElement('div');
+    mainContentBlock.classList.add('flex', 'flex-col', 'w-full', 'max-w-[85%]');
+
+    // 3. Bubble chứa nội dung và timestamp
     const contentWrapper = document.createElement('div');
-    // Bong bóng chứa nội dung
-    contentWrapper.classList.add('p-3', 'rounded-lg', 'max-w-[80%]', 'shadow-sm');
+    contentWrapper.classList.add('message-bubble', 'p-3', 'rounded-lg', 'shadow-md');
 
+    // Căn chỉnh và style dựa trên người gửi
     if (msg.isUser) {
-        messageElement.classList.add('items-end'); // Căn phải cho user
+        messageContainer.classList.add('justify-end');
+        mainContentBlock.classList.add('items-end');
+        avatarElement.classList.add('bg-primary-100', 'text-primary-700', 'order-2');
+        const userInfo = getUserInfo();
+        const userFullName = userInfo?.data?.fullName || '';
+        const userInitial = userFullName.trim().charAt(0).toUpperCase() || 'U';
+        avatarElement.textContent = userInitial;
         contentWrapper.classList.add('bg-primary-500', 'text-white', 'rounded-br-none');
-    } else {
-        messageElement.classList.add('items-start'); // Căn trái cho bot
-        contentWrapper.classList.add('bg-secondary-200', 'text-gray-900', 'rounded-bl-none');
-
-        // Thêm tên người gửi cho bot
+        mainContentBlock.classList.add('order-1');
+    } else { // Bot message
+        messageContainer.classList.add('justify-start');
+        mainContentBlock.classList.add('items-start');
+        avatarElement.classList.add('bg-white', 'border', 'border-gray-200', 'order-1', 'overflow-hidden');
+        avatarElement.innerHTML = ''; // Xóa SVG cũ nếu có
+        const logoImg = document.createElement('img');
+        logoImg.src = 'logo/logo.png';
+        logoImg.alt = 'Bot Avatar';
+        logoImg.classList.add('w-full', 'h-full', 'object-cover');
+        avatarElement.appendChild(logoImg);
+        contentWrapper.classList.add('bg-gray-100', 'text-gray-900', 'rounded-bl-none');
+        mainContentBlock.classList.add('order-2');
         const senderNameSpan = document.createElement('span');
-        senderNameSpan.className = 'text-xs font-medium text-secondary-600 mb-1 ml-1'; // Style cho tên bot
-        senderNameSpan.textContent = msg.senderName || 'Bot';
-        messageElement.appendChild(senderNameSpan); // Thêm tên *trước* bong bóng nội dung
+        senderNameSpan.className = 'text-xs font-semibold text-secondary-700 mb-1 ml-1';
+        senderNameSpan.textContent = msg.senderName || 'Assistant';
+        mainContentBlock.appendChild(senderNameSpan);
     }
 
-    // Render nội dung
-    const contentDiv = document.createElement('div'); // Sử dụng div thay vì p để hỗ trợ HTML từ Markdown
-    contentDiv.classList.add('message-content'); // Thêm class để dễ dàng target
+    // 4. Render nội dung thực tế vào div riêng bên trong bubble
+    const contentDiv = document.createElement('div');
+    // ĐỔI TÊN CLASS để addMessageToChat dễ tìm đúng div này
+    contentDiv.classList.add('message-text-content', 'text-sm');
+
     if (msg.isUser) {
-        contentDiv.textContent = msg.content; // Text đơn giản cho user
+        contentDiv.textContent = msg.content;
     } else {
-        contentDiv.innerHTML = renderMarkdown(msg.content || ''); // Render Markdown cho bot, đảm bảo không phải null
-        // highlightCodeBlocks sẽ được gọi sau khi append vào DOM ở ui.js
+        if (msg.isStreaming) {
+            // *** Xử lý trạng thái Streaming cho Bot ***
+            contentDiv.innerHTML = `<div class="ellipsis-animation"><span>.</span><span>.</span><span>.</span></div><div class="markdown-content" style="min-height: 1.5rem;"></div>`;
+            // Đảm bảo có class markdown-content để addMessageToChat tìm thấy
+        } else {
+            // Bot message đã hoàn thành
+            contentDiv.innerHTML = `<div class="markdown-content">${renderMarkdown(msg.content || '')}</div>`;
+            // Highlight code sẽ được thực hiện bởi addMessageToChat hoặc loadSessionUI sau khi element được thêm vào DOM
+        }
     }
-    contentWrapper.appendChild(contentDiv);
+    contentWrapper.appendChild(contentDiv); // Thêm nội dung vào bubble
 
-    // Thêm bong bóng nội dung vào messageElement
-    messageElement.appendChild(contentWrapper);
-
-    // Thêm timestamp *bên ngoài* và *sau* bong bóng nội dung
+    // 5. Thêm timestamp vào *bên trong* bubble
     const timeSpan = document.createElement('span');
-    // Căn chỉnh timestamp dựa trên người gửi
-    const timeAlignClass = msg.isUser ? 'text-right' : 'text-left';
-    timeSpan.className = `text-xs text-gray-400 mt-1 px-1 ${timeAlignClass}`;
+    const timeClasses = msg.isUser ? 'text-white/80' : 'text-gray-500';
+    timeSpan.className = `message-timestamp text-xs ${timeClasses} mt-1 block text-right`;
     timeSpan.textContent = new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    messageElement.appendChild(timeSpan);
+    contentWrapper.appendChild(timeSpan); // Thêm timestamp vào bubble
 
-    return messageElement;
+    // 6. Gắn bubble vào khối nội dung chính
+    mainContentBlock.appendChild(contentWrapper);
+
+    // 7. Gắn avatar và khối nội dung vào container hàng
+    messageContainer.appendChild(avatarElement);
+    messageContainer.appendChild(mainContentBlock);
+
+    return messageContainer; // Trả về container của cả hàng
 } 

@@ -1,4 +1,4 @@
-import { formatTime, renderMarkdown, highlightCodeBlocks, renderMessageElement } from './utils.js';
+﻿import { formatTime, renderMarkdown, highlightCodeBlocks, renderMessageElement } from './utils.js';
 
 // --- DOM Element References ---
 // Elements are now passed as arguments to functions that need them.
@@ -80,74 +80,91 @@ export function showLoading(show, loadingElement) {
  * @returns {HTMLElement | null} Phần tử chứa nội dung tin nhắn (để cập nhật khi streaming) hoặc null.
  */
 export function addMessageToChat(message, chatContainerElement, isUser = false, save = true, customId = null, timestamp = null, isStreaming = false) {
-    console.log(`%c[ui.js] addMessageToChat CALLED. User: ${isUser}, Streaming: ${isStreaming}, ID: ${customId || '(auto)'}`, 'color: orange;');
+    console.log(`%c[ui.js] addMessageToChat CALLED (Refactored). User: ${isUser}, Streaming: ${isStreaming}, ID: ${customId || '(auto)'}`, 'color: blue; font-weight: bold;');
     if (!chatContainerElement) {
         console.error('[ui.js] addMessageToChat: chatContainerElement not provided!');
         return null;
     }
-    if (!message && !customId && !isStreaming) {
-        console.warn('[ui.js] addMessageToChat called with no message/id and not streaming, aborting.');
+
+    // Create the message data object for renderMessageElement
+    const msgData = {
+        id: customId || `temp-${Date.now()}`, // Generate a temporary ID if none provided
+        content: message || '', // Ensure content is at least an empty string
+        isUser: isUser,
+        timestamp: timestamp || new Date().toISOString(),
+        // senderName will be handled by renderMessageElement based on isUser and potentially getUserInfo
+        // Add isStreaming flag for renderMessageElement to handle placeholder
+        isStreaming: isStreaming
+    };
+
+    // --- Create the message element using the utility function ---
+    const messageElement = renderMessageElement(msgData);
+
+    if (!messageElement) {
+        console.error('[ui.js] renderMessageElement failed to create an element for:', msgData);
         return null;
     }
 
-    const messageDiv = document.createElement('div');
-    if (customId) messageDiv.id = customId;
-    const now = timestamp ? new Date(timestamp) : new Date();
-    const timeStr = formatTime(now);
+    // --- Append and scroll ---
+    chatContainerElement.appendChild(messageElement);
+    console.log(`[ui.js]   -> Appended message element (via renderMessageElement) to chatContainer. Child count: ${chatContainerElement.childElementCount}`);
 
-    let contentDiv = null;
-
-    if (isUser) {
-        messageDiv.className = 'flex flex-col items-end space-y-1 animate-fade-in mb-4';
-        const timeDiv = document.createElement('div');
-        timeDiv.className = 'text-xs text-secondary-500 mr-2';
-        timeDiv.textContent = timeStr;
-        messageDiv.appendChild(timeDiv);
-
-        contentDiv = document.createElement('div');
-        contentDiv.className = 'bg-primary-600 text-white px-4 py-2 rounded-t-2xl rounded-bl-2xl max-w-[85%] shadow-sm';
-        contentDiv.textContent = message; // Safe for user messages
-        messageDiv.appendChild(contentDiv);
-    } else { // Bot message
-        messageDiv.className = 'flex flex-col space-y-1 animate-fade-in mb-4';
-        const timeDiv = document.createElement('div');
-        timeDiv.className = 'text-xs text-secondary-500 ml-2';
-        timeDiv.textContent = timeStr;
-        messageDiv.appendChild(timeDiv);
-
-        const messageRow = document.createElement('div');
-        messageRow.className = 'flex items-start';
-
-        contentDiv = document.createElement('div');
-        contentDiv.className = 'bg-secondary-100 text-secondary-800 px-4 py-2 rounded-t-2xl rounded-br-2xl max-w-[85%] shadow-sm message-content';
-
-        if (isStreaming) {
-            contentDiv.innerHTML = `<div class="ellipsis-animation"><span>.</span><span>.</span><span>.</span></div><div class="markdown-content" style="min-height: 1.5rem;"></div>`;
-        } else if (message) {
-            contentDiv.innerHTML = `<div class="markdown-content">${renderMarkdown(message)}</div>`; // Render Markdown for bot messages
-            setTimeout(() => {
-                 try { highlightCodeBlocks(contentDiv); } catch (e) { console.error('[ui.js] Error highlighting code:', e); }
-            }, 50);
-        } else {
-            contentDiv.innerHTML = `<div class="markdown-content"></div>`; // Placeholder if message is null but not streaming
-        }
-
-        messageRow.appendChild(contentDiv);
-        messageDiv.appendChild(messageRow);
-    }
-
-    chatContainerElement.appendChild(messageDiv);
-    console.log(`[ui.js]   -> Appended message element to chatContainer. Child count: ${chatContainerElement.childElementCount}`);
+    // Scroll to bottom
     setTimeout(() => {
          try {
-             if (chatContainerElement.scrollHeight > chatContainerElement.clientHeight) {
-                chatContainerElement.scrollTop = chatContainerElement.scrollHeight;
-             }
+             // Ensure scrolling happens after potential reflows
+             requestAnimationFrame(() => {
+                 if (chatContainerElement.scrollHeight > chatContainerElement.clientHeight) {
+                     chatContainerElement.scrollTop = chatContainerElement.scrollHeight;
+                 }
+             });
          } catch(e) { console.error('[ui.js] Error scrolling chat:', e); }
     }, 0);
 
-    // Return the element holding the actual content for potential updates (streaming)
-    return isUser ? contentDiv : contentDiv.querySelector('.markdown-content') || contentDiv;
+    // --- Highlight code blocks if it's a complete bot message ---
+    if (!isUser && !isStreaming && message) {
+        setTimeout(() => {
+             try {
+                 // Highlight only within the newly added message element for efficiency
+                 highlightCodeBlocks(messageElement);
+             } catch (e) {
+                 console.error('[ui.js] Error highlighting code in new message:', e);
+             }
+        }, 50); // Delay slightly for rendering
+    }
+
+    // --- Return the correct element for streaming updates ---
+    // Tìm bubble chứa nội dung
+    const bubbleElement = messageElement.querySelector('.message-bubble');
+
+    if (bubbleElement) {
+        // Tìm container chứa text/markdown bên trong bubble
+        const textContentElement = bubbleElement.querySelector('.message-text-content');
+
+        if (textContentElement) {
+            if (isStreaming && !isUser) {
+                // Nếu là bot đang streaming, tìm div .markdown-content bên trong .message-text-content
+                const markdownContentElement = textContentElement.querySelector('.markdown-content');
+                if (markdownContentElement) {
+                    console.log('[ui.js] Returning .markdown-content for streaming update.');
+                    return markdownContentElement;
+                } else {
+                    console.warn('[ui.js] Could not find .markdown-content inside .message-text-content for streaming.');
+                    return textContentElement; // Fallback: trả về container text
+                }
+            } else {
+                 // Nếu là tin nhắn user hoặc bot đã hoàn thành, trả về container text chính
+                 // (Mặc dù việc cập nhật user message thường không cần thiết)
+                 // console.log('[ui.js] Returning .message-text-content for non-streaming or user message.');
+                 // return textContentElement;
+                 // -> Quyết định: Trả về null vì handleSseStream chỉ cần phần tử cho streaming
+                 return null;
+            }
+        }
+    }
+
+    console.warn('[ui.js] Could not find bubble or text content element to return for updates.');
+    return null; // Fallback an toàn
 }
 
 /**
@@ -264,73 +281,73 @@ export function updateHistorySidebar(sessions, currentId, onSelect, onDelete, hi
 }
 
 /**
- * Hiển thị giao diện cho một session cụ thể (thường là sau khi chọn từ sidebar hoặc tạo mới).
- * Xóa tin nhắn cũ và hiển thị tin nhắn mới (hoặc welcome message nếu không có tin nhắn).
- * @param {object} session - Đối tượng session.
- * @param {Function} showWelcomeFn - Hàm để hiển thị welcome message (từ chat.js).
- * @param {object} domElements - Object chứa tham chiếu đến các element DOM.
+ * Tải giao diện cho một session cụ thể (tin nhắn, v.v.).
+ * @param {object | null} session - Đối tượng session cần tải. Null nếu không có session.
+ * @param {Function} showWelcomeFn - Hàm để hiển thị màn hình chào mừng.
+ * @param {object} domElements - Object containing references to key DOM elements.
  */
 export function loadSessionUI(session, showWelcomeFn, domElements) {
     console.log(`[ui.js] Loading UI for session: ${session?.id}`);
-    // Extract necessary elements from domElements
     const chatContainerElement = domElements?.chatContainer;
     const welcomeElement = domElements?.welcomeMessageDiv;
-    const chatMessagesElement = domElements?.chatMessagesDiv; // The outer container
+    const chatMessagesElement = domElements?.chatMessagesDiv; // Assuming this is the parent
 
     if (!chatContainerElement || !welcomeElement || !chatMessagesElement) {
-        console.error('[ui.js] loadSessionUI: Missing essential DOM elements in domElements object.', domElements);
-        // Optionally show an error message to the user
+        console.error('[ui.js] loadSessionUI: Missing required DOM elements!', domElements);
+        // Optionally show an error to the user
         return;
     }
 
-    // Clear previous content and hide welcome message
-    chatContainerElement.innerHTML = '';
-    welcomeElement.classList.add('hidden');
-    chatMessagesElement.classList.remove('hidden'); // Show chat area
+    chatContainerElement.innerHTML = ''; // Clear previous messages
+    chatContainerElement.scrollTop = chatContainerElement.scrollHeight; // Scroll to bottom initially
 
     if (!session || !session.messages || session.messages.length === 0) {
-        console.log(`[ui.js] Session ${session?.id || '(new)'} has no messages. Showing welcome message.`);
-        if (showWelcomeFn && typeof showWelcomeFn === 'function') {
-             console.log('[ui.js] Calling showWelcomeFn');
-             try {
-                showWelcomeFn(); // Call the handler passed from session.js/main.js
-             } catch (e) {
-                 console.error('[ui.js] Error calling showWelcomeFn:', e);
-             }
-        } else {
-            console.warn('[ui.js] showWelcomeFn not provided or not a function. Cannot show dynamic welcome.');
-            // Fallback: maybe show a default message or leave empty?
-             welcomeElement.classList.remove('hidden'); // Show the static one as fallback?
-             chatMessagesElement.classList.add('hidden'); // Hide chat area again
-        }
+        console.log('[ui.js] Session is empty. Preparing chat area for dynamic welcome message.');
+        // --- THAY ĐỔI LOGIC --- 
+        // 1. Ẩn màn hình chào mừng tĩnh
+        welcomeElement.classList.add('hidden');
+        // 2. Xóa class căn giữa khỏi container cha (nếu có)
+        chatMessagesElement.classList.remove('items-center', 'justify-center');
+        // 3. Hiển thị container chat (nó đã được xóa nội dung ở trên)
+        chatContainerElement.classList.remove('hidden');
+        // 4. KHÔNG gọi showWelcomeFn nữa. Việc này sẽ do startNewChat xử lý.
+        // if (showWelcomeFn) { ... } // <<< BỎ ĐI
+
     } else {
-        console.log(`[ui.js] Rendering ${session.messages.length} messages for session ${session.id}`);
+        console.log(`[ui.js] Session ${session.id} has ${session.messages.length} messages. Rendering...`);
+        welcomeElement.classList.add('hidden');
+        chatMessagesElement.classList.remove('items-center', 'justify-center'); // Remove centering
+        chatContainerElement.classList.remove('hidden');
+
+        // *** Đây là phần quan trọng ***
         const fragment = document.createDocumentFragment();
         session.messages.forEach(msg => {
-            // Use the centralized renderMessageElement function
+            // **Đang gọi renderMessageElement!**
             const messageElement = renderMessageElement(msg);
-            fragment.appendChild(messageElement);
+            if (messageElement) { // Check if element was created successfully
+                fragment.appendChild(messageElement);
+            } else {
+                 console.warn('[ui.js] renderMessageElement returned null for message:', msg);
+            }
         });
         chatContainerElement.appendChild(fragment);
+        console.log(`[ui.js]   -> Appended ${fragment.childElementCount} message elements.`);
 
-        // Highlight code blocks AFTER appending to DOM
-        try {
-            highlightCodeBlocks(chatContainerElement);
-        } catch(e) {
-            console.error('[ui.js] Error highlighting code blocks on initial load:', e);
-        }
-
-        // Scroll to the bottom after loading messages
+        // Scroll to bottom after rendering initial messages
         setTimeout(() => {
-             try {
-                 if (chatContainerElement.scrollHeight > chatContainerElement.clientHeight) {
-                    chatContainerElement.scrollTop = chatContainerElement.scrollHeight;
-                 }
-             } catch (e) { console.error('[ui.js] Error scrolling chat on initial load:', e); }
-        }, 50); // Slight delay might help ensure layout is complete
-    }
+            chatContainerElement.scrollTop = chatContainerElement.scrollHeight;
+            console.log('[ui.js] Scrolled to bottom after initial message load.');
+        }, 0); // Timeout to allow DOM updates
 
-    console.log(`[ui.js] Finished loading UI for session ${session?.id}. Chat container children: ${chatContainerElement.childElementCount}`);
+        // Highlight code blocks after adding messages to DOM
+        try {
+             highlightCodeBlocks(chatContainerElement);
+        } catch (e) {
+             console.error('[ui.js] Error highlighting code blocks on initial load:', e);
+        }
+    }
+     // Update history sidebar highlight (session.js handles the actual ID change, UI just reflects)
+     // updateHistorySidebar(getAllSessions(), session?.id, handleSelectSession, handleDeleteRequest); // This call might be redundant if session.js already calls it
 }
 
 /**

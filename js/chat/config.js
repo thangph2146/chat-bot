@@ -1,4 +1,4 @@
-// Cấu hình API (Chuẩn hóa)
+﻿// Cấu hình API (Chuẩn hóa)
 export const API_BASE_URL = 'http://172.20.10.44:8055/api'; // URL cơ sở chính
 export const AUTH_LOGIN_ENDPOINT = `${API_BASE_URL}/Users/login`; // Endpoint đăng nhập
 export const AUTH_REGISTER_ENDPOINT = `${API_BASE_URL}/Users/register`; // Endpoint đăng ký

@@ -1,4 +1,4 @@
-import { AUTH_REGISTER_ENDPOINT } from '../chat/config.js';
+﻿import { AUTH_REGISTER_ENDPOINT } from '../chat/config.js';
 import { fetchWithAuth } from '../chat/api.js';
 
 /**

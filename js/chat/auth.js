@@ -1,4 +1,4 @@
-import { showNotification } from './ui.js';
+﻿import { showNotification } from './ui.js';
 
 export const USER_DATA_KEY = 'hub_user_data'; // Key to store user data in localStorage
 

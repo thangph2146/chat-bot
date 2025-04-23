@@ -1,4 +1,4 @@
-import { DIFY_CHAT_API_ENDPOINT, DIFY_API_KEY, SAVE_MESSAGE_ENDPOINT } from './config.js';
+﻿import { DIFY_CHAT_API_ENDPOINT, DIFY_API_KEY, SAVE_MESSAGE_ENDPOINT } from './config.js';
 import { getUserInfo } from './auth.js';
 import { getCurrentSession, getCurrentSessionId, addMessageToCurrentSession, updateCurrentSessionTitle, updateCurrentSessionConversationId } from './session.js';
 import { showLoading, addMessageToChat, showNotification } from './ui.js';
@@ -70,12 +70,6 @@ export async function handleSendMessage(domElements) {
     messageInput.value = '';
     messageInput.style.height = 'auto';
 
-    // --- Update title if first message (client-side) ---
-    if (currentSession.title && currentSession.title.startsWith('Cuộc trò chuyện mới') && messageToSend.length > 0) {
-        const newTitle = messageToSend.length > 30 ? messageToSend.substring(0, 27) + '...' : messageToSend;
-        updateCurrentSessionTitle(newTitle, domElements); // Add domElements argument
-    }
-
     // --- Bước 2: Gọi AI (Dify) để lấy câu trả lời (sử dụng domElements) ---
     showLoading(true /*, pass loadingIndicator element if ui.js requires it */); // Need to update showLoading call if needed
     // Pass chatContainer to addMessageToChat
@@ -101,6 +95,20 @@ export async function handleSendMessage(domElements) {
             (result) => {
                 console.log('[chat.js] Dify stream completed. Saving AI message.');
                 const aiMessageContent = result.fullMessage ? result.fullMessage.trim() : ""; // Trim whitespace
+
+                // --- Tìm và xóa hiệu ứng typing --- 
+                if (aiPlaceholderElement && aiPlaceholderElement.closest) {
+                    // Tìm lại message bubble chứa placeholder này
+                    const messageBubble = aiPlaceholderElement.closest('.message-bubble');
+                    if (messageBubble) {
+                        const ellipsis = messageBubble.querySelector('.ellipsis-animation');
+                        if (ellipsis) {
+                            ellipsis.remove();
+                            console.log('[chat.js][onComplete] Removed ellipsis animation.');
+                        }
+                    }
+                }
+                // -------------------------------------
 
                 // Chỉ lưu tin nhắn AI nếu có nội dung thực sự
                 if (aiMessageContent) {
@@ -253,6 +261,19 @@ export async function showWelcomeMessage(domElements) {
             (result) => {
                 console.log('[chat.js] Welcome message stream completed from Dify.', { conversationId: result.conversationId });
                 const fullWelcomeMessage = result.fullMessage || "Chào bạn! Có thể bạn muốn hỏi về tuyển sinh HUB?";
+
+                // --- Tìm và xóa hiệu ứng typing --- 
+                if (aiPlaceholderElement && aiPlaceholderElement.closest) {
+                    const messageBubble = aiPlaceholderElement.closest('.message-bubble');
+                    if (messageBubble) {
+                        const ellipsis = messageBubble.querySelector('.ellipsis-animation');
+                        if (ellipsis) {
+                            ellipsis.remove();
+                            console.log('[chat.js][onComplete-Welcome] Removed ellipsis animation.');
+                        }
+                    }
+                }
+                // -------------------------------------
 
                 // --- Save AI Welcome Message to Backend --- 
                 const aiPayload = {

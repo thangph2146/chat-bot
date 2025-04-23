@@ -1,4 +1,4 @@
-import { AUTH_LOGIN_ENDPOINT, AUTH_GOOGLE_LOGIN_ENDPOINT, AUTH_GOOGLE_LOGIN_CUSTOM_ENDPOINT, AUTH_GOOGLE_VERIFY_ENDPOINT } from '../chat/config.js';
+﻿import { AUTH_LOGIN_ENDPOINT, AUTH_GOOGLE_LOGIN_ENDPOINT, AUTH_GOOGLE_LOGIN_CUSTOM_ENDPOINT, AUTH_GOOGLE_VERIFY_ENDPOINT } from '../chat/config.js';
 import { getUserInfo as getUserInfoFromAuth, USER_DATA_KEY } from '../chat/auth.js'; // Correct path: Go up one level then into chat
 import { fetchWithAuth } from '../chat/api.js'; // Correct path: Go up one level then into chat
 import { showNotification } from '../chat/ui.js'; // Import showNotification for consistency
