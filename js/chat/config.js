@@ -10,6 +10,7 @@ export const SESSIONS_API_ENDPOINT = `${API_BASE_URL}/ChatSessions`; // Endpoint
 export const SAVE_MESSAGE_ENDPOINT = `${API_BASE_URL}/ChatMessages`; // Endpoint để tạo tin nhắn mới
 
 // Cấu hình Google Client ID
+export const GOOGLE_CLIENT_ID = '197433305936-sffe02eu5jecf94m1oh1rn6igrosv6f3.apps.googleusercontent.com';
 
 // Cấu hình cho Dify (Nếu bạn sử dụng API Dify trực tiếp thay vì embed)
 export const DIFY_API_BASE_URL = 'http://trolyai.hub.edu.vn';
