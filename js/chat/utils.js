@@ -163,4 +163,58 @@ export function highlightCodeBlocks(containerElement) {
             }
         });
     }
+}
+
+/**
+ * Tạo phần tử DOM cho một tin nhắn.
+ * @param {object} msg - Dữ liệu tin nhắn (ví dụ: { id, content, isUser, timestamp, senderName }).
+ * @returns {HTMLElement} Phần tử DOM của tin nhắn.
+ */
+export function renderMessageElement(msg) {
+    const messageElement = document.createElement('div');
+    // Container chính cho mỗi tin nhắn, sử dụng flex để căn chỉnh
+    messageElement.classList.add('message-item', 'mb-4', 'flex', 'flex-col');
+    messageElement.dataset.messageId = msg.id;
+
+    const contentWrapper = document.createElement('div');
+    // Bong bóng chứa nội dung
+    contentWrapper.classList.add('p-3', 'rounded-lg', 'max-w-[80%]', 'shadow-sm');
+
+    if (msg.isUser) {
+        messageElement.classList.add('items-end'); // Căn phải cho user
+        contentWrapper.classList.add('bg-primary-500', 'text-white', 'rounded-br-none');
+    } else {
+        messageElement.classList.add('items-start'); // Căn trái cho bot
+        contentWrapper.classList.add('bg-secondary-200', 'text-gray-900', 'rounded-bl-none');
+
+        // Thêm tên người gửi cho bot
+        const senderNameSpan = document.createElement('span');
+        senderNameSpan.className = 'text-xs font-medium text-secondary-600 mb-1 ml-1'; // Style cho tên bot
+        senderNameSpan.textContent = msg.senderName || 'Bot';
+        messageElement.appendChild(senderNameSpan); // Thêm tên *trước* bong bóng nội dung
+    }
+
+    // Render nội dung
+    const contentDiv = document.createElement('div'); // Sử dụng div thay vì p để hỗ trợ HTML từ Markdown
+    contentDiv.classList.add('message-content'); // Thêm class để dễ dàng target
+    if (msg.isUser) {
+        contentDiv.textContent = msg.content; // Text đơn giản cho user
+    } else {
+        contentDiv.innerHTML = renderMarkdown(msg.content || ''); // Render Markdown cho bot, đảm bảo không phải null
+        // highlightCodeBlocks sẽ được gọi sau khi append vào DOM ở ui.js
+    }
+    contentWrapper.appendChild(contentDiv);
+
+    // Thêm bong bóng nội dung vào messageElement
+    messageElement.appendChild(contentWrapper);
+
+    // Thêm timestamp *bên ngoài* và *sau* bong bóng nội dung
+    const timeSpan = document.createElement('span');
+    // Căn chỉnh timestamp dựa trên người gửi
+    const timeAlignClass = msg.isUser ? 'text-right' : 'text-left';
+    timeSpan.className = `text-xs text-gray-400 mt-1 px-1 ${timeAlignClass}`;
+    timeSpan.textContent = new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    messageElement.appendChild(timeSpan);
+
+    return messageElement;
 } 

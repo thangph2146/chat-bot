@@ -1,4 +1,4 @@
-import { formatTime, renderMarkdown, highlightCodeBlocks } from './utils.js';
+import { formatTime, renderMarkdown, highlightCodeBlocks, renderMessageElement } from './utils.js';
 
 // --- DOM Element References ---
 // Elements are now passed as arguments to functions that need them.
@@ -268,47 +268,69 @@ export function updateHistorySidebar(sessions, currentId, onSelect, onDelete, hi
  * Xóa tin nhắn cũ và hiển thị tin nhắn mới (hoặc welcome message nếu không có tin nhắn).
  * @param {object} session - Đối tượng session.
  * @param {Function} showWelcomeFn - Hàm để hiển thị welcome message (từ chat.js).
- * @param {HTMLElement | null} chatContainerElement - Tham chiếu đến container chat.
- * @param {HTMLElement | null} welcomeElement - Tham chiếu đến div welcome tĩnh.
- * @param {HTMLElement | null} chatMessagesElement - Tham chiếu đến div chứa tin nhắn chat.
+ * @param {object} domElements - Object chứa tham chiếu đến các element DOM.
  */
-export function loadSessionUI(session, showWelcomeFn, chatContainerElement, welcomeElement, chatMessagesElement) {
-    console.log(`[ui.js] Loading UI for session ID: ${session?.id}`);
+export function loadSessionUI(session, showWelcomeFn, domElements) {
+    console.log(`[ui.js] Loading UI for session: ${session?.id}`);
+    // Extract necessary elements from domElements
+    const chatContainerElement = domElements?.chatContainer;
+    const welcomeElement = domElements?.welcomeMessageDiv;
+    const chatMessagesElement = domElements?.chatMessagesDiv; // The outer container
+
     if (!chatContainerElement || !welcomeElement || !chatMessagesElement) {
-        console.error('[ui.js] loadSessionUI: Missing critical elements (chatContainer, welcome, chatMessages).');
+        console.error('[ui.js] loadSessionUI: Missing essential DOM elements in domElements object.', domElements);
+        // Optionally show an error message to the user
         return;
     }
 
-    // Xóa nội dung chat cũ và ẩn welcome tĩnh, hiện khu vực chat
+    // Clear previous content and hide welcome message
     chatContainerElement.innerHTML = '';
     welcomeElement.classList.add('hidden');
-    chatMessagesElement.classList.remove('hidden'); // Ensure chat area is visible
+    chatMessagesElement.classList.remove('hidden'); // Show chat area
 
-    if (session && session.messages && session.messages.length > 0) {
+    if (!session || !session.messages || session.messages.length === 0) {
+        console.log(`[ui.js] Session ${session?.id || '(new)'} has no messages. Showing welcome message.`);
+        if (showWelcomeFn && typeof showWelcomeFn === 'function') {
+             console.log('[ui.js] Calling showWelcomeFn');
+             try {
+                showWelcomeFn(); // Call the handler passed from session.js/main.js
+             } catch (e) {
+                 console.error('[ui.js] Error calling showWelcomeFn:', e);
+             }
+        } else {
+            console.warn('[ui.js] showWelcomeFn not provided or not a function. Cannot show dynamic welcome.');
+            // Fallback: maybe show a default message or leave empty?
+             welcomeElement.classList.remove('hidden'); // Show the static one as fallback?
+             chatMessagesElement.classList.add('hidden'); // Hide chat area again
+        }
+    } else {
         console.log(`[ui.js] Rendering ${session.messages.length} messages for session ${session.id}`);
+        const fragment = document.createDocumentFragment();
         session.messages.forEach(msg => {
-            addMessageToChat(msg.content, chatContainerElement, msg.isUser, false, msg.id, msg.timestamp);
+            // Use the centralized renderMessageElement function
+            const messageElement = renderMessageElement(msg);
+            fragment.appendChild(messageElement);
         });
-        // Cuộn xuống dưới cùng sau khi thêm tất cả tin nhắn
+        chatContainerElement.appendChild(fragment);
+
+        // Highlight code blocks AFTER appending to DOM
+        try {
+            highlightCodeBlocks(chatContainerElement);
+        } catch(e) {
+            console.error('[ui.js] Error highlighting code blocks on initial load:', e);
+        }
+
+        // Scroll to the bottom after loading messages
         setTimeout(() => {
              try {
                  if (chatContainerElement.scrollHeight > chatContainerElement.clientHeight) {
                     chatContainerElement.scrollTop = chatContainerElement.scrollHeight;
                  }
-             } catch(e) { console.error('[ui.js] Error scrolling after loading session:', e); }
-        }, 50);
-    } else {
-        // Nếu không có tin nhắn, gọi hàm hiển thị welcome message động
-        console.log(`[ui.js] Session ${session?.id} has no messages. Calling showWelcomeFn.`);
-        if (showWelcomeFn) {
-            showWelcomeFn(chatContainerElement, welcomeElement, chatMessagesElement); // Pass elements down
-        } else {
-            console.error('[ui.js] showWelcomeFn not provided to loadSessionUI!');
-             // Fallback: Hiển thị thông báo tĩnh nếu hàm không có
-             chatContainerElement.innerHTML = '<p class="text-center text-secondary-500 p-4">Bắt đầu cuộc trò chuyện mới!</p>';
-        }
+             } catch (e) { console.error('[ui.js] Error scrolling chat on initial load:', e); }
+        }, 50); // Slight delay might help ensure layout is complete
     }
-     console.log(`[ui.js] Finished loading UI for session ID: ${session?.id}`);
+
+    console.log(`[ui.js] Finished loading UI for session ${session?.id}. Chat container children: ${chatContainerElement.childElementCount}`);
 }
 
 /**
