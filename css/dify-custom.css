@@ -1,0 +1,19 @@
+/* css/dify-custom.css */
+/* Custom styles for the embedded Dify chatbot */
+
+#dify-chatbot-bubble-button {
+    background-color: #b42c1c !important; /* Use primary-600 color */
+    /* Add other bubble button customizations here if needed */
+}
+
+#dify-chatbot-bubble-window {
+    width: 24rem !important; /* Example: Adjust width as needed */
+    height: 40rem !important; /* Example: Adjust height as needed */
+    /* Add other window customizations here */
+}
+
+/* You can add more specific selectors to customize further */
+/* Example: Header color */
+/* #dify-chatbot-bubble-window .chatbot-header {
+    background-color: #your-color !important;
+} */ 

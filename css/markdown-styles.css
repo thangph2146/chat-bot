@@ -1,0 +1,101 @@
+/* Kiểu cho nội dung markdown */
+.markdown-content {
+    line-height: 1.6;
+}
+.markdown-content h1, .markdown-content h2, .markdown-content h3 {
+    margin-top: 1rem;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+}
+.markdown-content ul, .markdown-content ol {
+    margin-left: 1rem;
+    margin-bottom: 1rem;
+}
+.markdown-content a {
+    color: #b42c1c; /* primary-600 */
+    text-decoration: none;
+}
+.markdown-content a:hover {
+    text-decoration: underline;
+}
+.markdown-content code {
+    font-family: 'Courier New', monospace;
+    padding: 0.1rem 0.3rem;
+    border-radius: 0.2rem;
+    background-color: #f1f5f9; /* secondary-100 or gray-100 */
+}
+.markdown-content pre {
+    margin: 1rem 0;
+    border-radius: 0.4rem;
+    overflow-x: auto;
+    /* Ensure pre takes block display for proper formatting */
+    display: block;
+    position: relative; /* Needed for copy button positioning */
+}
+.markdown-content pre code {
+    padding: 1rem;
+    border-radius: 0.3rem;
+    background-color: #1e293b; /* slate-800 */
+    color: #e2e8f0; /* slate-200 */
+    display: block;
+    white-space: pre;
+    -webkit-overflow-scrolling: touch;
+}
+
+/* Hiệu ứng ellipsis động */
+.ellipsis-animation span {
+    display: inline-block; /* Cần để áp dụng transform */
+    opacity: 0;
+    transform: scale(0.5); /* Bắt đầu nhỏ */
+    animation: ellipsis-scale 1.4s infinite ease-in-out;
+}
+.ellipsis-animation span:nth-child(1) {
+    animation-delay: 0.0s;
+}
+.ellipsis-animation span:nth-child(2) {
+    animation-delay: 0.2s;
+}
+.ellipsis-animation span:nth-child(3) {
+    animation-delay: 0.4s;
+}
+@keyframes ellipsis-scale {
+    0% { transform: scale(0.5); opacity: 0; }
+    50% { transform: scale(1); opacity: 1; }
+    100% { transform: scale(0.5); opacity: 0; }
+}
+
+/* Style for Copy Code Button */
+.copy-code-btn {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    padding: 0.25rem 0.5rem;
+    background-color: #334155; /* slate-700 */
+    color: #cbd5e1; /* slate-300 */
+    border: none;
+    border-radius: 0.25rem;
+    cursor: pointer;
+    opacity: 0.3;
+    transition: opacity 0.2s ease-in-out;
+}
+.markdown-content pre:hover .copy-code-btn {
+    opacity: 1;
+}
+.copy-code-btn:hover {
+    background-color: #475569; /* slate-600 */
+}
+.copy-code-btn svg {
+    width: 1em;
+    height: 1em;
+    vertical-align: middle;
+}
+
+/* Blinking cursor for streaming */
+.blinking-cursor {
+  animation: blink 1s step-end infinite;
+}
+
+@keyframes blink {
+  from, to { opacity: 1 }
+  50% { opacity: 0 }
+} 
