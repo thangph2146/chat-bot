@@ -1,71 +1,77 @@
 import { formatTime, renderMarkdown, highlightCodeBlocks } from './utils.js';
 
 // --- DOM Element References ---
-// It's better to get these elements in the main script after DOMContentLoaded
-// and pass them to the functions or make them available globally/scoped.
-// For now, we define selectors here for simplicity, but this might need refactoring.
+// Elements are now passed as arguments to functions that need them.
+// Remove direct DOM lookups here.
+/*
 const chatContainer = document.getElementById('chatContainer');
 const loadingIndicator = document.getElementById('loadingIndicator');
 const historySessions = document.getElementById('historySessions');
 const recordButton = document.getElementById('recordButton');
 const welcomeMessageElement = document.getElementById('welcomeMessage');
+*/
 
 // --- State (Placeholder - should be managed elsewhere) ---
-// These variables are needed by some UI functions but should ideally be managed
-// in a dedicated state management module or the main script.
+// Remove state management from UI module
+/*
 let currentSessionId = null; // Example: Will be set by session logic
 let chatSessions = []; // Example: Will be populated by session logic
+*/
 
 // Dependencies to be injected/resolved later:
-// - loadSessionMessages (from session.js)
-// - deleteSession (from session.js)
-// - startNewChat (from session.js)
-// - showWelcomeMessage (from chat.js or main.js)
+// ... (Keep comments if needed)
 
 // --- UI Update Functions ---
 
 /**
  * Cập nhật giao diện nút ghi âm.
  * @param {boolean} isRecording - Trạng thái đang ghi âm.
+ * @param {HTMLElement | null} recordButtonElement - Tham chiếu đến nút ghi âm.
  */
-export function updateRecordingUI(isRecording) {
+export function updateRecordingUI(isRecording, recordButtonElement) {
     console.log('[ui.js] Updating recording UI, isRecording:', isRecording);
-    if (!recordButton) return;
+    if (!recordButtonElement) {
+         console.warn('[ui.js] updateRecordingUI: recordButtonElement not provided.');
+         return;
+    }
     if (isRecording) {
-        recordButton.classList.add('recording', 'animate-pulse');
-        recordButton.title = 'Đang ghi âm... Nhấn để dừng';
+        recordButtonElement.classList.add('recording', 'animate-pulse');
+        recordButtonElement.title = 'Đang ghi âm... Nhấn để dừng';
         document.body.classList.add('recording-active');
     } else {
-        recordButton.classList.remove('recording', 'animate-pulse');
-        recordButton.title = 'Ghi âm giọng nói';
+        recordButtonElement.classList.remove('recording', 'animate-pulse');
+        recordButtonElement.title = 'Ghi âm giọng nói';
         document.body.classList.remove('recording-active');
     }
 }
 
 /**
  * Ẩn tin nhắn chào mừng tĩnh trong HTML.
+ * @param {HTMLElement | null} welcomeElement - Tham chiếu đến div welcome message.
  */
-export function hideStaticWelcomeMessage() {
+export function hideStaticWelcomeMessage(welcomeElement) {
     console.log('[ui.js] Hiding static welcome message.');
-    if (welcomeMessageElement) {
-        welcomeMessageElement.classList.add('hidden');
+    if (welcomeElement) {
+        welcomeElement.classList.add('hidden');
     }
 }
 
 /**
  * Hiển thị hoặc ẩn chỉ báo loading.
  * @param {boolean} show - True để hiển thị, false để ẩn.
+ * @param {HTMLElement | null} loadingElement - Tham chiếu đến chỉ báo loading.
  */
-export function showLoading(show) {
+export function showLoading(show, loadingElement) {
     console.log('[ui.js] Setting loading indicator visibility:', show);
-    if (loadingIndicator) {
-        loadingIndicator.style.display = show ? 'flex' : 'none';
+    if (loadingElement) {
+        loadingElement.style.display = show ? 'flex' : 'none';
     }
 }
 
 /**
  * Thêm tin nhắn vào giao diện chat.
  * @param {string | null} message - Nội dung tin nhắn. Null nếu là placeholder cho streaming.
+ * @param {HTMLElement | null} chatContainerElement - Tham chiếu đến container chứa các tin nhắn.
  * @param {boolean} [isUser=false] - True nếu là tin nhắn của người dùng.
  * @param {boolean} [save=true] - (DEPRECATED/MOVED) Logic lưu đã chuyển đi.
  * @param {string | null} [customId=null] - ID tùy chỉnh cho phần tử tin nhắn.
@@ -73,10 +79,10 @@ export function showLoading(show) {
  * @param {boolean} [isStreaming=false] - True nếu đang streaming tin nhắn từ bot.
  * @returns {HTMLElement | null} Phần tử chứa nội dung tin nhắn (để cập nhật khi streaming) hoặc null.
  */
-export function addMessageToChat(message, isUser = false, save = true, customId = null, timestamp = null, isStreaming = false) {
+export function addMessageToChat(message, chatContainerElement, isUser = false, save = true, customId = null, timestamp = null, isStreaming = false) {
     console.log(`%c[ui.js] addMessageToChat CALLED. User: ${isUser}, Streaming: ${isStreaming}, ID: ${customId || '(auto)'}`, 'color: orange;');
-    if (!chatContainer) {
-        console.error('[ui.js] chatContainer element not found!');
+    if (!chatContainerElement) {
+        console.error('[ui.js] addMessageToChat: chatContainerElement not provided!');
         return null;
     }
     if (!message && !customId && !isStreaming) {
@@ -100,7 +106,7 @@ export function addMessageToChat(message, isUser = false, save = true, customId 
 
         contentDiv = document.createElement('div');
         contentDiv.className = 'bg-primary-600 text-white px-4 py-2 rounded-t-2xl rounded-bl-2xl max-w-[85%] shadow-sm';
-        contentDiv.textContent = message;
+        contentDiv.textContent = message; // Safe for user messages
         messageDiv.appendChild(contentDiv);
     } else { // Bot message
         messageDiv.className = 'flex flex-col space-y-1 animate-fade-in mb-4';
@@ -118,7 +124,7 @@ export function addMessageToChat(message, isUser = false, save = true, customId 
         if (isStreaming) {
             contentDiv.innerHTML = `<div class="ellipsis-animation"><span>.</span><span>.</span><span>.</span></div><div class="markdown-content" style="min-height: 1.5rem;"></div>`;
         } else if (message) {
-            contentDiv.innerHTML = `<div class="markdown-content">${renderMarkdown(message)}</div>`;
+            contentDiv.innerHTML = `<div class="markdown-content">${renderMarkdown(message)}</div>`; // Render Markdown for bot messages
             setTimeout(() => {
                  try { highlightCodeBlocks(contentDiv); } catch (e) { console.error('[ui.js] Error highlighting code:', e); }
             }, 50);
@@ -130,12 +136,12 @@ export function addMessageToChat(message, isUser = false, save = true, customId 
         messageDiv.appendChild(messageRow);
     }
 
-    chatContainer.appendChild(messageDiv);
-    console.log(`[ui.js]   -> Appended message element to chatContainer. Child count: ${chatContainer.childElementCount}`);
+    chatContainerElement.appendChild(messageDiv);
+    console.log(`[ui.js]   -> Appended message element to chatContainer. Child count: ${chatContainerElement.childElementCount}`);
     setTimeout(() => {
          try {
-             if (chatContainer.scrollHeight > chatContainer.clientHeight) {
-                chatContainer.scrollTop = chatContainer.scrollHeight;
+             if (chatContainerElement.scrollHeight > chatContainerElement.clientHeight) {
+                chatContainerElement.scrollTop = chatContainerElement.scrollHeight;
              }
          } catch(e) { console.error('[ui.js] Error scrolling chat:', e); }
     }, 0);
@@ -150,14 +156,18 @@ export function addMessageToChat(message, isUser = false, save = true, customId 
  * @param {string | null} currentId - ID của session hiện tại đang được chọn.
  * @param {Function} onSelect - Callback khi một session được chọn.
  * @param {Function} onDelete - Callback khi nút xóa session được nhấn.
+ * @param {HTMLElement | null} historySessionsElement - Tham chiếu đến div chứa lịch sử.
+ * @param {HTMLElement | null} chatContainerElement - Tham chiếu đến container chat.
+ * @param {HTMLElement | null} welcomeElement - Tham chiếu đến div welcome tĩnh.
+ * @param {HTMLElement | null} chatMessagesElement - Tham chiếu đến div chứa tin nhắn chat.
  */
-export function updateHistorySidebar(sessions, currentId, onSelect, onDelete) {
+export function updateHistorySidebar(sessions, currentId, onSelect, onDelete, historySessionsElement, chatContainerElement, welcomeElement, chatMessagesElement) {
     console.log(`[ui.js] Updating history sidebar. Sessions count: ${sessions?.length}, Current ID: ${currentId}`);
-    if (!historySessions) {
-        console.error('[ui.js] historySessions element not found!');
+    if (!historySessionsElement) {
+        console.error('[ui.js] updateHistorySidebar: historySessionsElement not provided!');
         return;
     }
-    historySessions.innerHTML = '';
+    historySessionsElement.innerHTML = '';
 
     if (!sessions || sessions.length === 0) {
         console.log('[ui.js] No sessions to display in sidebar.');
@@ -214,16 +224,20 @@ export function updateHistorySidebar(sessions, currentId, onSelect, onDelete) {
             if (e.target.closest('.delete-session-btn')) return;
             const clickedSessionId = historyItem.dataset.sessionId;
             console.log(`[ui.js] History item clicked: ${clickedSessionId}`);
-            if (clickedSessionId !== currentId) {
+            // Check if currentId is defined before comparing
+            if (typeof currentId === 'undefined' || clickedSessionId !== currentId) { 
                 if (onSelect) {
                     try {
                         console.log(`[ui.js] Calling onSelect handler for ${clickedSessionId}`);
-                        await onSelect(clickedSessionId);
+                        await onSelect(clickedSessionId, historySessionsElement, chatContainerElement, welcomeElement, chatMessagesElement);
                     } catch (selectError) {
                         console.error('[ui.js] Error calling onSelect handler:', selectError);
                     }
                 }
+            } else {
+                 console.log(`[ui.js] Clicked on the currently active session (${clickedSessionId}), no action needed.`);
             }
+            // Close sidebar on mobile after selection regardless of whether it was active
             if (window.innerWidth < 768) {
                 document.getElementById('closeHistorySidebar')?.click();
             }
@@ -237,247 +251,299 @@ export function updateHistorySidebar(sessions, currentId, onSelect, onDelete) {
             if (onDelete) {
                  try {
                      console.log(`[ui.js] Calling onDelete handler for ${sessionIdToDelete}`);
-                     onDelete(sessionIdToDelete);
+                     onDelete(sessionIdToDelete, historySessionsElement, chatContainerElement, welcomeElement, chatMessagesElement);
                  } catch (deleteError) {
                      console.error('[ui.js] Error calling onDelete handler:', deleteError);
                  }
             }
         });
 
-        historySessions.appendChild(historyItem);
+        historySessionsElement.appendChild(historyItem);
     });
      console.log('[ui.js] Finished updating history sidebar.');
 }
 
 /**
- * Tải giao diện cho một phiên chat (hiển thị tin nhắn đã có).
- * @param {object | null} session - Đối tượng session chứa messages.
- * @param {Function} showWelcomeFn - Hàm để hiển thị welcome message nếu session trống.
+ * Hiển thị giao diện cho một session cụ thể (thường là sau khi chọn từ sidebar hoặc tạo mới).
+ * Xóa tin nhắn cũ và hiển thị tin nhắn mới (hoặc welcome message nếu không có tin nhắn).
+ * @param {object} session - Đối tượng session.
+ * @param {Function} showWelcomeFn - Hàm để hiển thị welcome message (từ chat.js).
+ * @param {HTMLElement | null} chatContainerElement - Tham chiếu đến container chat.
+ * @param {HTMLElement | null} welcomeElement - Tham chiếu đến div welcome tĩnh.
+ * @param {HTMLElement | null} chatMessagesElement - Tham chiếu đến div chứa tin nhắn chat.
  */
-export function loadSessionUI(session, showWelcomeFn) {
-    console.log(`%c[ui.js] loadSessionUI CALLED for session: ${session ? session.id : 'null/invalid'}`, 'color: green; font-weight: bold;');
-    if (!chatContainer) {
-         console.error('[ui.js] chatContainer not found in loadSessionUI!');
-         return;
+export function loadSessionUI(session, showWelcomeFn, chatContainerElement, welcomeElement, chatMessagesElement) {
+    console.log(`[ui.js] Loading UI for session ID: ${session?.id}`);
+    if (!chatContainerElement || !welcomeElement || !chatMessagesElement) {
+        console.error('[ui.js] loadSessionUI: Missing critical elements (chatContainer, welcome, chatMessages).');
+        return;
     }
-    chatContainer.innerHTML = '';
 
-    if (session?.messages?.length > 0) {
-        console.log(`[ui.js] Session ${session.id} has ${session.messages.length} messages. Rendering loop starting...`);
-        hideStaticWelcomeMessage();
-        try {
-            session.messages.forEach((msg, index) => {
-                // Add check for message content
-                if (msg && typeof msg.content !== 'undefined') { // Check if content exists
-                    console.log(`[ui.js]   Loop ${index}: Calling addMessageToChat for msg ID ${msg.id || '(no ID)'}, user=${msg.isUser}`);
-                    addMessageToChat(msg.content, msg.isUser, false, msg.id, msg.timestamp);
-                } else {
-                    console.warn(`[ui.js]   Loop ${index}: Skipping message with missing content in session ${session.id}:`, msg);
-                }
-            });
-        } catch(renderError) {
-             console.error(`[ui.js] Error rendering messages for session ${session.id}:`, renderError);
-        }
+    // Xóa nội dung chat cũ và ẩn welcome tĩnh, hiện khu vực chat
+    chatContainerElement.innerHTML = '';
+    welcomeElement.classList.add('hidden');
+    chatMessagesElement.classList.remove('hidden'); // Ensure chat area is visible
+
+    if (session && session.messages && session.messages.length > 0) {
+        console.log(`[ui.js] Rendering ${session.messages.length} messages for session ${session.id}`);
+        session.messages.forEach(msg => {
+            addMessageToChat(msg.content, chatContainerElement, msg.isUser, false, msg.id, msg.timestamp);
+        });
+        // Cuộn xuống dưới cùng sau khi thêm tất cả tin nhắn
         setTimeout(() => {
-            try {
-                if (chatContainer.scrollHeight > chatContainer.clientHeight) {
-                    chatContainer.scrollTop = chatContainer.scrollHeight;
-                    console.log(`[ui.js] Scrolled to bottom after rendering messages for ${session.id}.`);
-                }
-            } catch (scrollError) {
-                 console.error(`[ui.js] Error scrolling after rendering messages for ${session.id}:`, scrollError);
-            }
+             try {
+                 if (chatContainerElement.scrollHeight > chatContainerElement.clientHeight) {
+                    chatContainerElement.scrollTop = chatContainerElement.scrollHeight;
+                 }
+             } catch(e) { console.error('[ui.js] Error scrolling after loading session:', e); }
         }, 50);
-    } else if (session) {
-        console.log(`[ui.js] Session ${session.id} exists but has no messages. Calling showWelcomeFn.`);
-        if (showWelcomeFn && typeof showWelcomeFn === 'function') {
-            showWelcomeFn();
-        } else {
-            console.warn('[ui.js] showWelcomeFn is not available or not a function.');
-            // Show a basic message if welcome function isn't available
-             chatContainer.innerHTML = '<p class="text-center text-secondary-500 p-4">Bắt đầu trò chuyện!</p>';
-        }
     } else {
-        console.warn(`[ui.js] loadSessionUI called with null/invalid session. Calling showWelcomeFn.`);
-         if (showWelcomeFn && typeof showWelcomeFn === 'function') {
-            showWelcomeFn();
+        // Nếu không có tin nhắn, gọi hàm hiển thị welcome message động
+        console.log(`[ui.js] Session ${session?.id} has no messages. Calling showWelcomeFn.`);
+        if (showWelcomeFn) {
+            showWelcomeFn(chatContainerElement, welcomeElement, chatMessagesElement); // Pass elements down
         } else {
-             console.warn('[ui.js] showWelcomeFn is not available or not a function.');
-             chatContainer.innerHTML = '<p class="text-center text-secondary-500 p-4">Không có phiên chat nào được chọn.</p>';
+            console.error('[ui.js] showWelcomeFn not provided to loadSessionUI!');
+             // Fallback: Hiển thị thông báo tĩnh nếu hàm không có
+             chatContainerElement.innerHTML = '<p class="text-center text-secondary-500 p-4">Bắt đầu cuộc trò chuyện mới!</p>';
         }
     }
+     console.log(`[ui.js] Finished loading UI for session ID: ${session?.id}`);
 }
 
-
 /**
- * Hiển thị hộp thoại xác nhận xóa TẤT CẢ lịch sử.
- * @param {Function} onConfirm - Callback khi người dùng xác nhận xóa.
+ * Hiển thị dialog xác nhận xóa toàn bộ lịch sử.
+ * @param {Function} onConfirm - Callback sẽ được gọi nếu người dùng xác nhận.
  */
 export function showClearHistoryDialog(onConfirm) {
-    console.log('[ui.js] Showing clear history confirmation dialog.');
-    const confirmDialog = document.createElement('div');
-    confirmDialog.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
-    confirmDialog.id = 'confirmDialog';
-    const dialogContent = document.createElement('div'); // Define dialogContent
-    dialogContent.className = 'bg-white rounded-xl p-6 max-w-md shadow-xl';
-    const dialogTitle = document.createElement('h3');
-    dialogTitle.className = 'text-xl font-bold text-red-600 mb-4';
-    dialogTitle.textContent = 'Xác nhận xóa';
-    const dialogMessage = document.createElement('p');
-    dialogMessage.className = 'mb-6 text-secondary-700';
-    dialogMessage.textContent = 'Bạn có chắc chắn muốn xóa toàn bộ lịch sử chat? Hành động này không thể hoàn tác.';
-    const buttonContainer = document.createElement('div');
-    buttonContainer.className = 'flex justify-end gap-3';
-    const cancelButton = document.createElement('button');
-    cancelButton.className = 'px-4 py-2 bg-secondary-200 text-secondary-800 rounded-lg hover:bg-secondary-300 transition-colors';
-    cancelButton.textContent = 'Hủy';
-    cancelButton.onclick = () => {
-        console.log('[ui.js] Clear history cancelled.');
-        document.body.removeChild(confirmDialog);
-    };
-    const confirmButton = document.createElement('button');
-    confirmButton.className = 'px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors';
-    confirmButton.textContent = 'Xóa tất cả';
-    confirmButton.onclick = () => {
-        console.log('[ui.js] Clear history confirmed.');
-        if (onConfirm) {
-             try { onConfirm(); } catch(e) { console.error('[ui.js] Error in onConfirm for clear history:', e); }
-        }
-        document.body.removeChild(confirmDialog);
-    };
-    buttonContainer.appendChild(cancelButton);
-    buttonContainer.appendChild(confirmButton);
-    dialogContent.appendChild(dialogTitle);
-    dialogContent.appendChild(dialogMessage);
-    dialogContent.appendChild(buttonContainer);
-    confirmDialog.appendChild(dialogContent);
-    document.body.appendChild(confirmDialog);
-}
+    // Check if dialog exists
+    let dialog = document.getElementById('confirmClearHistoryDialog');
+    if (dialog) {
+        dialog.remove(); // Remove existing dialog to avoid duplicates
+    }
 
-/**
- * Hiển thị hộp thoại xác nhận xóa MỘT session.
- * @param {string} sessionTitle - Tiêu đề của session cần xóa.
- * @param {Function} onConfirm - Callback khi người dùng xác nhận xóa.
- */
-export function showDeleteSessionDialog(sessionTitle, onConfirm) {
-     console.log(`[ui.js] Showing delete confirmation dialog for: ${sessionTitle}`);
-    const confirmDialog = document.createElement('div');
-    confirmDialog.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
-    confirmDialog.id = 'confirmDialog';
-    confirmDialog.innerHTML = `
-        <div class="bg-white rounded-xl p-6 max-w-md w-full mx-4 shadow-xl">
-            <h3 class="text-xl font-bold text-red-600 mb-4">Xác nhận xóa</h3>
-            <p class="text-secondary-700 mb-6">Bạn có chắc chắn muốn xóa <strong class="font-semibold">${sessionTitle || 'cuộc trò chuyện này'}</strong> không? Hành động này không thể hoàn tác.</p>
-            <div class="flex justify-end gap-3">
-                <button id="cancel-delete" class="px-4 py-2 rounded-lg bg-secondary-200 text-secondary-800 hover:bg-secondary-300 transition-colors">Hủy</button>
-                <button id="confirm-delete" class="px-4 py-2 rounded-lg bg-red-500 text-white hover:bg-red-600 transition-colors">Xóa</button>
+    // Create dialog HTML
+    dialog = document.createElement('div');
+    dialog.id = 'confirmClearHistoryDialog';
+    dialog.className = 'fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50 animate-fade-in';
+    dialog.innerHTML = `
+        <div class="bg-white p-6 rounded-lg shadow-xl w-full max-w-sm mx-auto transform transition-all scale-95 opacity-0 modal-content">
+            <div class="text-center">
+                <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 mb-4">
+                    <svg class="h-6 w-6 text-red-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                </div>
+                <h3 class="text-lg leading-6 font-medium text-gray-900 mb-2">Xác nhận Xóa Toàn Bộ Lịch Sử?</h3>
+                <p class="text-sm text-gray-500 mb-6">Hành động này không thể hoàn tác. Tất cả các cuộc trò chuyện sẽ bị xóa vĩnh viễn.</p>
+                <div class="flex justify-center gap-4">
+                    <button id="cancelClearBtn" class="px-4 py-2 bg-gray-200 text-gray-800 text-base font-medium rounded-md shadow-sm hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-colors">
+                        Hủy bỏ
+                    </button>
+                    <button id="confirmClearBtn" class="px-4 py-2 bg-red-600 text-white text-base font-medium rounded-md shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors">
+                        Xác nhận Xóa
+                    </button>
+                </div>
             </div>
         </div>
     `;
-    document.body.appendChild(confirmDialog);
+
+    document.body.appendChild(dialog);
+
+    const modalContent = dialog.querySelector('.modal-content');
+    const confirmBtn = document.getElementById('confirmClearBtn');
+    const cancelBtn = document.getElementById('cancelClearBtn');
+
     const closeDialog = () => {
-        const dialog = document.getElementById('confirmDialog');
-        if (dialog && document.body.contains(dialog)) {
-            document.body.removeChild(dialog);
-        }
+         if(modalContent) {
+             modalContent.classList.remove('scale-100', 'opacity-100');
+             modalContent.classList.add('scale-95', 'opacity-0');
+         }
+        setTimeout(() => {
+            dialog?.remove();
+        }, 300); // Match transition duration
     };
-    const confirmButton = confirmDialog.querySelector('#confirm-delete');
-    const cancelButton = confirmDialog.querySelector('#cancel-delete');
-    cancelButton.addEventListener('click', () => {
-         console.log(`[ui.js] Delete session cancelled for: ${sessionTitle}`);
-         closeDialog();
+
+    confirmBtn?.addEventListener('click', () => {
+        if (onConfirm) {
+            onConfirm();
+        }
+        closeDialog();
     });
-    confirmButton.addEventListener('click', async () => {
-        console.log(`[ui.js] Delete session confirmed for: ${sessionTitle}. Executing onConfirm...`);
-        confirmButton.textContent = 'Đang xóa...';
-        confirmButton.disabled = true;
-        cancelButton.disabled = true;
-        try {
-            if (onConfirm) {
-                await onConfirm();
-            }
-            console.log(`[ui.js] onConfirm completed for delete dialog: ${sessionTitle}`);
+
+    cancelBtn?.addEventListener('click', closeDialog);
+    dialog.addEventListener('click', (e) => { // Close on overlay click
+        if (e.target === dialog) {
             closeDialog();
-        } catch (error) {
-            console.error("[ui.js] Error during delete confirmation execution:", error);
-            confirmButton.textContent = 'Xóa';
-            confirmButton.disabled = false;
-            cancelButton.disabled = false;
         }
     });
+
+    // Trigger enter animation
+    requestAnimationFrame(() => {
+         if (modalContent) {
+             modalContent.classList.remove('scale-95', 'opacity-0');
+             modalContent.classList.add('scale-100', 'opacity-100');
+         }
+    });
+
+    console.log('[ui.js] Clear history confirmation dialog shown.');
 }
 
-
 /**
- * Hiển thị thông báo đơn giản.
- * @param {string} message - Nội dung thông báo.
- * @param {string} [type='info'] - Loại thông báo: 'info', 'success', 'warning', 'error'.
- * @param {number} [duration=3000] - Thời gian hiển thị (ms).
- * @returns {HTMLElement} Phần tử thông báo.
+ * Hiển thị dialog xác nhận xóa một session cụ thể.
+ * @param {string} sessionTitle - Tiêu đề của session để hiển thị trong dialog.
+ * @param {Function} onConfirm - Callback sẽ được gọi nếu người dùng xác nhận.
  */
-export function showNotification(message, type = 'info', duration = 3000) {
-     console.log(`[ui.js] Showing notification. Type: ${type}, Message: ${message}`);
-    const notification = document.createElement('div');
-    let bgColor, textColor, iconSvg;
+export function showDeleteSessionDialog(sessionTitle, onConfirm) {
+    let dialog = document.getElementById('confirmDeleteSessionDialog');
+    if (dialog) dialog.remove();
 
-    switch (type) {
-        case 'success':
-            bgColor = 'bg-green-500';
-            textColor = 'text-white';
-            iconSvg = `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>`;
-            break;
-        case 'warning':
-            bgColor = 'bg-yellow-500';
-            textColor = 'text-white';
-            iconSvg = `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>`;
-            break;
-        case 'error':
-            bgColor = 'bg-red-500';
-            textColor = 'text-white';
-            iconSvg = `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>`;
-            break;
-        default: // info
-            bgColor = 'bg-blue-500';
-            textColor = 'text-white';
-            iconSvg = `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>`;
-    }
+    dialog = document.createElement('div');
+    dialog.id = 'confirmDeleteSessionDialog';
+    dialog.className = 'fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50 animate-fade-in';
+    dialog.innerHTML = `
+         <div class="bg-white p-6 rounded-lg shadow-xl w-full max-w-sm mx-auto transform transition-all scale-95 opacity-0 modal-content">
+             <div class="text-center">
+                 <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 mb-4">
+                     <svg class="h-6 w-6 text-red-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                         <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                     </svg>
+                 </div>
+                 <h3 class="text-lg leading-6 font-medium text-gray-900 mb-2">Xác nhận Xóa Hội Thoại?</h3>
+                 <p class="text-sm text-gray-500 mb-1">Bạn có chắc chắn muốn xóa cuộc trò chuyện:</p>
+                 <p class="text-sm font-semibold text-gray-700 mb-6 truncate" title="${sessionTitle}">${sessionTitle}</p>
+                 <p class="text-xs text-red-500 mb-6">Hành động này không thể hoàn tác.</p>
+                 <div class="flex justify-center gap-4">
+                     <button id="cancelDeleteSessionBtn" class="px-4 py-2 bg-gray-200 text-gray-800 text-base font-medium rounded-md shadow-sm hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-colors">
+                         Hủy bỏ
+                     </button>
+                     <button id="confirmDeleteSessionBtn" class="px-4 py-2 bg-red-600 text-white text-base font-medium rounded-md shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors">
+                         Xác nhận Xóa
+                     </button>
+                 </div>
+             </div>
+         </div>
+     `;
 
-    notification.className = `fixed bottom-4 right-4 ${bgColor} ${textColor} px-4 py-3 rounded-lg shadow-lg z-50 flex items-center transform translate-y-20 opacity-0 transition-all duration-300`;
-    notification.innerHTML = `
-        ${iconSvg}
-        <span>${message}</span>
-    `;
+    document.body.appendChild(dialog);
 
-    document.body.appendChild(notification);
+    const modalContent = dialog.querySelector('.modal-content');
+    const confirmBtn = document.getElementById('confirmDeleteSessionBtn');
+    const cancelBtn = document.getElementById('cancelDeleteSessionBtn');
 
-    setTimeout(() => {
-        notification.style.transform = 'translateY(0)';
-        notification.style.opacity = '1';
-    }, 10);
-
-    let timeoutId = null;
-    const removeNotification = () => {
-        notification.style.transform = 'translateY(20px)';
-        notification.style.opacity = '0';
+    const closeDialog = () => {
+         if(modalContent) {
+             modalContent.classList.remove('scale-100', 'opacity-100');
+             modalContent.classList.add('scale-95', 'opacity-0');
+         }
         setTimeout(() => {
-            if (document.body.contains(notification)) {
-                document.body.removeChild(notification);
-            }
+            dialog?.remove();
         }, 300);
     };
 
-    if (duration > 0) {
-         timeoutId = setTimeout(removeNotification, duration);
+    confirmBtn?.addEventListener('click', () => {
+        if (onConfirm) onConfirm();
+        closeDialog();
+    });
+    cancelBtn?.addEventListener('click', closeDialog);
+    dialog.addEventListener('click', (e) => { if (e.target === dialog) closeDialog(); });
+
+    // Trigger enter animation
+    requestAnimationFrame(() => {
+         if (modalContent) {
+             modalContent.classList.remove('scale-95', 'opacity-0');
+             modalContent.classList.add('scale-100', 'opacity-100');
+         }
+    });
+     console.log('[ui.js] Delete session confirmation dialog shown.');
+}
+
+/**
+ * Hiển thị thông báo nổi (toast).
+ * @param {string} message - Nội dung thông báo.
+ * @param {'info'|'success'|'warning'|'error'} [type='info'] - Loại thông báo.
+ * @param {number} [duration=3000] - Thời gian hiển thị (ms).
+ */
+export function showNotification(message, type = 'info', duration = 3000) {
+    const containerId = 'notification-container';
+    let container = document.getElementById(containerId);
+
+    // Create container if it doesn't exist
+    if (!container) {
+        container = document.createElement('div');
+        container.id = containerId;
+        container.className = 'fixed top-4 right-4 z-[100] flex flex-col items-end space-y-3';
+        document.body.appendChild(container);
     }
 
-    notification.addEventListener('mouseenter', () => {
-        if (timeoutId) clearTimeout(timeoutId);
+    const notification = document.createElement('div');
+    notification.className = 'notification-item transform transition-all duration-300 ease-in-out translate-y-full opacity-0 max-w-[400px] min-w-[350px] w-full shadow-lg rounded-lg pointer-events-auto ring-1 ring-black ring-opacity-5 overflow-hidden border';
+
+    let bgColor, textColor, iconSvg, borderColor;
+    switch (type) {
+        case 'success':
+            bgColor = 'bg-green-50'; textColor = 'text-green-800'; borderColor = 'border-green-200';
+            iconSvg = `<svg class="h-6 w-6 text-green-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>`;
+            break;
+        case 'warning':
+            bgColor = 'bg-yellow-50'; textColor = 'text-yellow-800'; borderColor = 'border-yellow-200';
+            iconSvg = `<svg class="h-6 w-6 text-yellow-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" /></svg>`;
+            break;
+        case 'error':
+            bgColor = 'bg-red-50'; textColor = 'text-red-800'; borderColor = 'border-red-200';
+            iconSvg = `<svg class="h-6 w-6 text-red-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" /></svg>`;
+            break;
+        default: // info
+            bgColor = 'bg-blue-50'; textColor = 'text-blue-800'; borderColor = 'border-blue-200';
+            iconSvg = `<svg class="h-6 w-6 text-blue-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" /></svg>`;
+            break;
+    }
+
+    notification.classList.add(bgColor, borderColor);
+    notification.innerHTML = `
+        <div class="p-4">
+            <div class="flex items-start">
+                <div class="flex-shrink-0">
+                    ${iconSvg}
+                </div>
+                <div class="ml-3 w-0 flex-1">
+                    <p class="text-sm font-medium ${textColor}">${message}</p>
+                </div>
+                <div class="ml-4 flex flex-shrink-0">
+                    <button type="button" class="inline-flex rounded-md ${bgColor} text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 close-notification-btn">
+                        <span class="sr-only">Close</span>
+                        <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" /></svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    container.appendChild(notification);
+
+    // Function to remove notification (Simplified)
+    const removeNotification = () => {
+        notification.classList.add('opacity-0'); // Fade out
+        // Optional: Add translate-y-2 for slight slide-out
+        // notification.classList.add('translate-y-2');
+        setTimeout(() => {
+            notification.remove();
+            if (container && !container.hasChildNodes()) {
+                container.remove();
+            }
+        }, 300); // Match transition duration
+    };
+
+    // Add event listener to close button
+    notification.querySelector('.close-notification-btn')?.addEventListener('click', removeNotification);
+
+    // Animate in (Reverted to simpler requestAnimationFrame)
+    requestAnimationFrame(() => {
+        notification.classList.remove('opacity-0');
     });
 
-    notification.addEventListener('mouseleave', () => {
-        if (timeoutId) clearTimeout(timeoutId);
-        timeoutId = setTimeout(removeNotification, 1000); // Add delay on mouseleave
-    });
+    // Auto remove after duration
+    setTimeout(removeNotification, duration);
 
-    return notification;
-} 
+    console.log(`[ui.js] Notification shown: ${message} (Type: ${type})`);
+}

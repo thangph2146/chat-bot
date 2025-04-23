@@ -45,8 +45,12 @@ export function getAllSessions() {
 /**
  * Thêm tin nhắn vào session hiện tại (client-side state).
  * @param {object} messageData - Dữ liệu tin nhắn (ví dụ: { id, content, isUser, timestamp }).
+ * @param {HTMLElement | null} historySessionsElement - Tham chiếu đến div lịch sử.
+ * @param {HTMLElement | null} chatContainerElement - Tham chiếu đến container chat.
+ * @param {HTMLElement | null} welcomeElement - Tham chiếu đến div welcome tĩnh.
+ * @param {HTMLElement | null} chatMessagesElement - Tham chiếu đến div chứa tin nhắn chat.
  */
-export function addMessageToCurrentSession(messageData) {
+export function addMessageToCurrentSession(messageData, historySessionsElement, chatContainerElement, welcomeElement, chatMessagesElement) {
      const session = getCurrentSession();
      if (session) {
          if (!session.messages) {
@@ -59,7 +63,7 @@ export function addMessageToCurrentSession(messageData) {
              console.log('[session.js] Added message, updating sidebar.');
              // No need to save cache here
              // Update sidebar to reflect new timestamp/activity
-             updateHistorySidebar(chatSessions, currentSessionId, handleSelectSession, handleDeleteRequest);
+             updateHistorySidebar(chatSessions, currentSessionId, handleSelectSession, handleDeleteRequest, historySessionsElement, chatContainerElement, welcomeElement, chatMessagesElement);
          }
      } else {
          console.warn("[session.js] Cannot add message: No current session selected.");
@@ -69,14 +73,18 @@ export function addMessageToCurrentSession(messageData) {
 /**
  * Cập nhật title cho session hiện tại (client-side state).
  * @param {string} newTitle - Tiêu đề mới.
+ * @param {HTMLElement | null} historySessionsElement - Tham chiếu đến div lịch sử.
+ * @param {HTMLElement | null} chatContainerElement - Tham chiếu đến container chat.
+ * @param {HTMLElement | null} welcomeElement - Tham chiếu đến div welcome tĩnh.
+ * @param {HTMLElement | null} chatMessagesElement - Tham chiếu đến div chứa tin nhắn chat.
  */
- export function updateCurrentSessionTitle(newTitle) {
+ export function updateCurrentSessionTitle(newTitle, historySessionsElement, chatContainerElement, welcomeElement, chatMessagesElement) {
     const session = getCurrentSession();
     if (session) {
         session.title = newTitle;
         session.lastUpdatedAt = new Date().toISOString();
         console.log('[session.js] Updated session title, updating sidebar.');
-        updateHistorySidebar(chatSessions, currentSessionId, handleSelectSession, handleDeleteRequest);
+        updateHistorySidebar(chatSessions, currentSessionId, handleSelectSession, handleDeleteRequest, historySessionsElement, chatContainerElement, welcomeElement, chatMessagesElement);
         // TODO: Add API call to update title on server if needed
         // await updateSessionTitleOnServer(currentSessionId, newTitle);
     }
@@ -98,9 +106,13 @@ export function updateCurrentSessionConversationId(convId) {
  * Tải danh sách các phiên chat của người dùng hiện tại từ API.
  * Sử dụng fetchWithAuth.
  * Endpoint: /api/ChatSessions/user/{userId}
+ * @param {HTMLElement | null} historySessionsElement - Tham chiếu đến div lịch sử (có thể null ban đầu).
+ * @param {HTMLElement | null} chatContainerElement - Tham chiếu đến div chứa tin nhắn (có thể null ban đầu).
+ * @param {HTMLElement | null} welcomeElement - Tham chiếu đến div welcome tĩnh (có thể null ban đầu).
+ * @param {HTMLElement | null} chatMessagesElement - Tham chiếu đến div bao ngoài khu vực chat (có thể null ban đầu).
  * @returns {Promise<boolean>} True nếu tải và xử lý thành công, False nếu có lỗi.
  */
-export async function loadChatSessions() {
+export async function loadChatSessions(historySessionsElement = null, chatContainerElement = null, welcomeElement = null, chatMessagesElement = null) {
     console.log('[session.js] ===> Attempting to load chat sessions...');
     if (isLoading) {
         console.log('[session.js] Load already in progress, skipping.');
@@ -111,19 +123,20 @@ export async function loadChatSessions() {
     const userInfo = getUserInfo();
     const userId = userInfo?.data?.userId;
 
+    const resolvedHistoryElement = historySessionsElement || document.getElementById('historySessions'); // Lấy nếu null
+
     if (userId === undefined || userId === null) {
         console.error("[session.js] User ID missing. Cannot fetch sessions.");
         showNotification('Lỗi xác thực, không thể tải lịch sử chat.', 'error');
-        const historyElement = document.getElementById('historySessions');
-        if (historyElement) historyElement.innerHTML = '<p class="text-center text-red-500 text-sm p-4">Lỗi xác thực.</p>';
-        updateHistorySidebar([], null, handleSelectSession, handleDeleteRequest);
+        if (resolvedHistoryElement) resolvedHistoryElement.innerHTML = '<p class="text-center text-red-500 text-sm p-4">Lỗi xác thực.</p>';
+        // Truyền historySessionsElement vào updateHistorySidebar
+        updateHistorySidebar([], null, handleSelectSession, handleDeleteRequest, resolvedHistoryElement, chatContainerElement, welcomeElement, chatMessagesElement);
         isLoading = false;
         return false;
     }
 
     const userSessionsApiUrl = `${SESSIONS_API_ENDPOINT}/user/${userId}`;
-    const historyElement = document.getElementById('historySessions');
-    if (historyElement) historyElement.innerHTML = '<p class="text-center text-secondary-500 text-sm p-4">Đang tải lịch sử...</p>';
+    if (resolvedHistoryElement) resolvedHistoryElement.innerHTML = '<p class="text-center text-secondary-500 text-sm p-4">Đang tải lịch sử...</p>';
 
     try {
         // Sử dụng fetchWithAuth (mặc định là GET và mong đợi JSON)
@@ -136,8 +149,9 @@ export async function loadChatSessions() {
             console.log(`[session.js] No sessions found for user ${userId}. Treating as empty list.`);
             chatSessions = [];
             currentSessionId = null;
-            if (historyElement) historyElement.innerHTML = `<p class="text-center text-secondary-500 text-sm p-4">Chưa có lịch sử trò chuyện.</p>`;
-            await startNewChat(); // Bắt đầu chat mới nếu không có session
+            if (resolvedHistoryElement) resolvedHistoryElement.innerHTML = `<p class="text-center text-secondary-500 text-sm p-4">Chưa có lịch sử trò chuyện.</p>`;
+            // Truyền các tham số element vào startNewChat
+            await startNewChat({ historySessions: resolvedHistoryElement, chatContainer: chatContainerElement, welcomeMessageDiv: welcomeElement, chatMessagesDiv: chatMessagesElement }); // <<< Truyền params
             isLoading = false;
             return true; // Thành công (danh sách rỗng)
         }
@@ -177,7 +191,7 @@ export async function loadChatSessions() {
         // Chỉ hiển thị thông báo nếu lỗi không phải là 401 (đã xử lý trong fetchWithAuth)
         if (!error.message.includes('401')) {
             showNotification(error.message || 'Không thể tải lịch sử chat.', 'error');
-            if (historyElement) historyElement.innerHTML = '<p class="text-center text-red-500 text-sm p-4">Lỗi tải lịch sử.</p>';
+            if (resolvedHistoryElement) resolvedHistoryElement.innerHTML = '<p class="text-center text-red-500 text-sm p-4">Lỗi tải lịch sử.</p>';
         }
         isLoading = false;
         console.log('[session.js] <=== Load chat sessions finished (Catch Error).');
@@ -188,8 +202,13 @@ export async function loadChatSessions() {
 /**
  * Tải tin nhắn chi tiết cho một session cụ thể từ API.
  * Sử dụng fetchWithAuth và endpoint: /api/ChatSessions/{sessionId}.
+ * @param {string} sessionId - ID của session cần tải.
+ * @param {HTMLElement} historySessionsElement - Tham chiếu đến div lịch sử.
+ * @param {HTMLElement} chatContainerElement - Tham chiếu đến div chứa tin nhắn.
+ * @param {HTMLElement} welcomeElement - Tham chiếu đến div welcome tĩnh.
+ * @param {HTMLElement} chatMessagesElement - Tham chiếu đến div bao ngoài khu vực chat.
  */
-export async function loadSessionMessages(sessionId) {
+export async function loadSessionMessages(sessionId, historySessionsElement, chatContainerElement, welcomeElement, chatMessagesElement) {
     console.log(`[session.js] Attempting to load session details AND messages for session: ${sessionId} using SESSIONS_API_ENDPOINT.`);
     const targetSession = chatSessions.find(s => s.id === sessionId);
     if (!targetSession) {
@@ -200,16 +219,18 @@ export async function loadSessionMessages(sessionId) {
 
     currentSessionId = sessionId;
     console.log(`[session.js] Set currentSessionId = ${currentSessionId}`);
-    updateHistorySidebar(chatSessions, currentSessionId, handleSelectSession, handleDeleteRequest);
+    // Truyền historySessionsElement và các element khác vào updateHistorySidebar
+    updateHistorySidebar(chatSessions, currentSessionId, handleSelectSession, handleDeleteRequest, historySessionsElement, chatContainerElement, welcomeElement, chatMessagesElement);
 
     // Xóa tin nhắn cũ trước khi tải
-    targetSession.messages = []; 
+    targetSession.messages = [];
     const sessionDetailApiUrl = `${SESSIONS_API_ENDPOINT}/${sessionId}`; // <<< Sử dụng lại endpoint session details
     console.log(`[session.js] Fetching session details & messages from ${sessionDetailApiUrl}...`);
 
-    const chatContainer = document.getElementById('chatContainer');
-    if (chatContainer) {
-         chatContainer.innerHTML = '<p class="text-center text-secondary-500 p-4">Đang tải tin nhắn...</p>';
+    // Không cần getElementById nữa vì đã có tham số chatContainerElement
+    // const chatContainer = document.getElementById('chatContainer');
+    if (chatContainerElement) {
+         chatContainerElement.innerHTML = '<p class="text-center text-secondary-500 p-4">Đang tải tin nhắn...</p>';
     }
 
     try {
@@ -250,16 +271,19 @@ export async function loadSessionMessages(sessionId) {
         // Sắp xếp lại list session theo lastUpdatedAt mới nhất
         chatSessions.sort((a, b) => new Date(b.lastUpdatedAt).getTime() - new Date(a.lastUpdatedAt).getTime());
 
-        updateHistorySidebar(chatSessions, currentSessionId, handleSelectSession, handleDeleteRequest);
+        // Truyền historySessionsElement và các element khác vào updateHistorySidebar
+        updateHistorySidebar(chatSessions, currentSessionId, handleSelectSession, handleDeleteRequest, historySessionsElement, chatContainerElement, welcomeElement, chatMessagesElement);
         console.log(`[session.js] Calling loadSessionUI for ${sessionId}.`);
-        loadSessionUI(targetSession, showWelcomeMessageHandler);
+        // Truyền các tham số element vào loadSessionUI
+        loadSessionUI(targetSession, showWelcomeMessageHandler, chatContainerElement, welcomeElement, chatMessagesElement);
 
     } catch (error) {
         console.error(`[session.js] Error in loadSessionMessages for ${sessionId}:`, error);
          if (!error.message.includes('401')) {
             showNotification(error.message || `Không thể tải tin nhắn cho cuộc trò chuyện này.`, 'error');
-            if (chatContainer) {
-                chatContainer.innerHTML = '<p class="text-center text-red-500 p-4">Lỗi tải tin nhắn.</p>';
+            // Sử dụng tham số chatContainerElement
+            if (chatContainerElement) {
+                chatContainerElement.innerHTML = '<p class="text-center text-red-500 p-4">Lỗi tải tin nhắn.</p>';
             }
          }
         if (targetSession) targetSession.messages = []; // Đảm bảo messages rỗng nếu lỗi
@@ -269,9 +293,24 @@ export async function loadSessionMessages(sessionId) {
 /**
  * Bắt đầu một phiên chat mới thông qua API.
  * Sử dụng fetchWithAuth.
+ * @param {object} domElements - Đối tượng chứa các tham chiếu đến phần tử DOM quan trọng.
+ *        (historySessions, chatContainer, welcomeMessageDiv, chatMessagesDiv)
  */
-export async function startNewChat() {
+export async function startNewChat(domElements) {
     console.log('[session.js] Attempting to start new chat...');
+    // Trích xuất các element cần thiết từ domElements
+    const historySessionsElement = domElements?.historySessions;
+    const chatContainerElement = domElements?.chatContainer;
+    const welcomeElement = domElements?.welcomeMessageDiv; // Đổi tên cho khớp với main.js
+    const chatMessagesElement = domElements?.chatMessagesDiv; // Đổi tên cho khớp với main.js
+
+    // Kiểm tra các element trước khi sử dụng (optional but recommended)
+    if (!historySessionsElement || !chatContainerElement || !welcomeElement || !chatMessagesElement) {
+        console.error('[session.js] startNewChat: Missing required DOM elements from domElements object.', domElements);
+        showNotification("Lỗi giao diện người dùng.", "error");
+        return; // Không tiếp tục nếu thiếu element
+    }
+
     if (isLoading) return;
     isLoading = true;
     const defaultTitle = "Cuộc trò chuyện mới";
@@ -312,8 +351,10 @@ export async function startNewChat() {
         currentSessionId = newSession.id;
         console.log(`[session.js] New session ${currentSessionId} added locally. Updating UI.`);
         chatSessions.sort((a, b) => new Date(b.lastUpdatedAt).getTime() - new Date(a.lastUpdatedAt).getTime());
-        updateHistorySidebar(chatSessions, currentSessionId, handleSelectSession, handleDeleteRequest);
-        loadSessionUI(newSession, showWelcomeMessageHandler);
+        // Truyền historySessionsElement và các element khác vào updateHistorySidebar
+        updateHistorySidebar(chatSessions, currentSessionId, handleSelectSession, handleDeleteRequest, historySessionsElement, chatContainerElement, welcomeElement, chatMessagesElement);
+        // Truyền các tham số element vào loadSessionUI
+        loadSessionUI(newSession, showWelcomeMessageHandler, chatContainerElement, welcomeElement, chatMessagesElement);
     } catch (error) {
         console.error('[session.js] Error creating new chat:', error);
          if (!error.message.includes('401')) {
@@ -328,14 +369,19 @@ export async function startNewChat() {
 /**
  * Xử lý yêu cầu xóa một session (hiển thị dialog).
  * @param {string} sessionId - ID của session cần xóa.
+ * @param {HTMLElement} historySessionsElement - Tham chiếu đến div lịch sử.
+ * @param {HTMLElement} chatContainerElement - Tham chiếu đến div chứa tin nhắn.
+ * @param {HTMLElement} welcomeElement - Tham chiếu đến div welcome tĩnh.
+ * @param {HTMLElement} chatMessagesElement - Tham chiếu đến div bao ngoài khu vực chat.
  */
-export function handleDeleteRequest(sessionId) {
+export function handleDeleteRequest(sessionId, historySessionsElement, chatContainerElement, welcomeElement, chatMessagesElement) {
     const sessionToDelete = chatSessions.find(s => s.id === sessionId);
     const sessionTitle = sessionToDelete?.title || "Cuộc trò chuyện này";
     console.log(`[session.js] Requesting delete confirmation for session: ${sessionId} (${sessionTitle})`);
     showDeleteSessionDialog(sessionTitle, async () => {
         console.log(`[session.js] Confirmed delete for session: ${sessionId}`);
-        await deleteSession(sessionId);
+        // Truyền các tham số element vào deleteSession
+        await deleteSession(sessionId, historySessionsElement, chatContainerElement, welcomeElement, chatMessagesElement); // <<< Truyền params
     });
 }
 
@@ -343,8 +389,12 @@ export function handleDeleteRequest(sessionId) {
  * Thực hiện xóa session thông qua API.
  * Sử dụng fetchWithAuth.
  * @param {string} sessionId - ID của session cần xóa.
+ * @param {HTMLElement} historySessionsElement - Tham chiếu đến div lịch sử.
+ * @param {HTMLElement} chatContainerElement - Tham chiếu đến div chứa tin nhắn.
+ * @param {HTMLElement} welcomeElement - Tham chiếu đến div welcome tĩnh.
+ * @param {HTMLElement} chatMessagesElement - Tham chiếu đến div bao ngoài khu vực chat.
  */
-async function deleteSession(sessionId) {
+async function deleteSession(sessionId, historySessionsElement, chatContainerElement, welcomeElement, chatMessagesElement) {
     const apiUrl = `${SESSIONS_API_ENDPOINT}/${sessionId}`;
     console.log(`[session.js] Attempting to DELETE session ${sessionId} via API: ${apiUrl}`);
 
@@ -365,14 +415,17 @@ async function deleteSession(sessionId) {
                 chatSessions.sort((a, b) => new Date(b.lastUpdatedAt).getTime() - new Date(a.lastUpdatedAt).getTime());
                 const newCurrentId = chatSessions[0].id;
                 console.log(`[session.js] New current session will be ${newCurrentId}. Loading its messages.`);
-                await loadSessionMessages(newCurrentId); // loadSessionMessages sẽ cập nhật sidebar
+                // Truyền các tham số element vào loadSessionMessages
+                await loadSessionMessages(newCurrentId, historySessionsElement, chatContainerElement, welcomeElement, chatMessagesElement); // loadSessionMessages sẽ cập nhật sidebar
             } else {
                 console.log(`[session.js] No sessions left after delete. Starting new chat.`);
-                await startNewChat();
+                // Truyền các tham số element vào startNewChat
+                await startNewChat({ historySessions: historySessionsElement, chatContainer: chatContainerElement, welcomeMessageDiv: welcomeElement, chatMessagesDiv: chatMessagesElement });
             }
         } else {
             console.log(`[session.js] Deleted a non-current session. Updating sidebar.`);
-            updateHistorySidebar(chatSessions, currentSessionId, handleSelectSession, handleDeleteRequest);
+            // Truyền historySessionsElement và các element khác vào updateHistorySidebar
+            updateHistorySidebar(chatSessions, currentSessionId, handleSelectSession, handleDeleteRequest, historySessionsElement, chatContainerElement, welcomeElement, chatMessagesElement);
         }
     } catch (error) {
         console.error(`[session.js] Error deleting session ${sessionId}:`, error);
@@ -384,48 +437,60 @@ async function deleteSession(sessionId) {
 }
 
 /**
- * Xử lý yêu cầu xóa toàn bộ lịch sử (hiển thị dialog).
+ * Xử lý yêu cầu xóa toàn bộ lịch sử chat (hiển thị dialog).
+ * @param {HTMLElement} historySessionsElement - Tham chiếu đến div lịch sử.
+ * @param {HTMLElement} chatContainerElement - Tham chiếu đến div chứa tin nhắn.
+ * @param {HTMLElement} welcomeElement - Tham chiếu đến div welcome tĩnh.
+ * @param {HTMLElement} chatMessagesElement - Tham chiếu đến div bao ngoài khu vực chat.
  */
-export function handleClearHistoryRequest() {
+export function handleClearHistoryRequest(historySessionsElement, chatContainerElement, welcomeElement, chatMessagesElement) {
     console.log('[session.js] Requesting clear history confirmation.');
-     showClearHistoryDialog(async () => {
+    showClearHistoryDialog(async () => {
         console.log('[session.js] Confirmed clear history.');
-         try {
-             // TODO: Thêm API call để xóa lịch sử phía server nếu cần
-             // Ví dụ: await fetchWithAuth(`${SESSIONS_API_ENDPOINT}/user/${userId}/clear`, { method: 'DELETE' });
-
-             console.log('[session.js] Clearing local chat history...');
-             chatSessions = [];
-             currentSessionId = null;
-             const chatContainer = document.getElementById('chatContainer');
-             if(chatContainer) chatContainer.innerHTML = '';
-             updateHistorySidebar(chatSessions, currentSessionId, handleSelectSession, handleDeleteRequest);
-             showNotification('Đã xóa toàn bộ lịch sử chat', 'success');
-             console.log('[session.js] Starting new chat after clearing history.');
-             await startNewChat();
-         } catch (error) {
-             console.error("[session.js] Error clearing chat history:", error);
-             showNotification(`Lỗi khi xóa lịch sử: ${error.message}`, 'error');
-         }
-     });
- }
+        const userInfo = getUserInfo();
+        const userId = userInfo?.data?.userId;
+        if (!userId) {
+            showNotification('Lỗi xác thực người dùng.', 'error');
+            return;
+        }
+        const apiUrl = `${SESSIONS_API_ENDPOINT}/user/${userId}`;
+        console.log(`[session.js] Attempting to DELETE all sessions for user ${userId} via API: ${apiUrl}`);
+        try {
+            // Sử dụng fetchWithAuth cho DELETE request, không mong đợi JSON body
+            await fetchWithAuth(apiUrl, { method: 'DELETE' }, false);
+            console.log(`[session.js] All sessions for user ${userId} deleted successfully via API.`);
+            showNotification('Đã xóa toàn bộ lịch sử chat.', 'success');
+            chatSessions.length = 0; // Xóa mảng local
+            currentSessionId = null;
+            console.log('[session.js] Starting new chat after clearing history.');
+            // Truyền các tham số element vào startNewChat
+            await startNewChat({ historySessions: historySessionsElement, chatContainer: chatContainerElement, welcomeMessageDiv: welcomeElement, chatMessagesDiv: chatMessagesElement }); // <<< Truyền params
+        } catch (error) {
+            console.error(`[session.js] Error clearing history for user ${userId}:`, error);
+            if (!error.message.includes('401')) {
+                showNotification(error.message || 'Không thể xóa lịch sử chat.', 'error');
+            }
+        }
+    });
+}
 
 /**
  * Xử lý khi người dùng chọn một session từ sidebar.
  * @param {string} sessionId - ID của session được chọn.
+ * @param {HTMLElement} historySessionsElement - Tham chiếu đến div lịch sử.
+ * @param {HTMLElement} chatContainerElement - Tham chiếu đến div chứa tin nhắn.
+ * @param {HTMLElement} welcomeElement - Tham chiếu đến div welcome tĩnh.
+ * @param {HTMLElement} chatMessagesElement - Tham chiếu đến div bao ngoài khu vực chat.
  */
-export async function handleSelectSession(sessionId) {
-     console.log(`%c[session.js] handleSelectSession TRIGGERED for session: ${sessionId}`, 'color: blue; font-weight: bold;');
-     if (isLoading) {
-         console.log(`[session.js] Selection change skipped, loading in progress.`);
-         return;
-     }
-     console.log(`[session.js] Checking conditions: isLoading=${isLoading}, sessionId=${sessionId}, currentSessionId=${currentSessionId}, shouldLoad=${sessionId !== currentSessionId}`);
-     if (sessionId !== currentSessionId) {
-        console.log(`[session.js] Session changed! Calling loadSessionMessages...`);
-        await loadSessionMessages(sessionId);
-        console.log(`[session.js] Finished processing selection change for ${sessionId}.`);
-     } else {
-        console.log(`[session.js] Clicked on the currently active session (${sessionId}). No messages reloaded.`);
-     }
- }
+export async function handleSelectSession(sessionId, historySessionsElement, chatContainerElement, welcomeElement, chatMessagesElement) {
+    console.log(`[session.js] handleSelectSession called for: ${sessionId}`);
+    if (sessionId && sessionId !== currentSessionId) {
+        console.log(`[session.js] Current session is ${currentSessionId}, selected ${sessionId}. Loading messages...`);
+        // Truyền các tham số element vào loadSessionMessages
+        await loadSessionMessages(sessionId, historySessionsElement, chatContainerElement, welcomeElement, chatMessagesElement);
+    } else if (sessionId === currentSessionId) {
+         console.log(`[session.js] Clicked on the already active session: ${sessionId}. No action needed.`);
+    } else {
+         console.warn(`[session.js] handleSelectSession called with invalid sessionId: ${sessionId}`);
+    }
+}

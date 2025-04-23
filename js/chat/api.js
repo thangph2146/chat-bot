@@ -2,8 +2,10 @@ import { renderMarkdown, highlightCodeBlocks } from './utils.js';
 import { getUserInfo } from './auth.js'; // Import để lấy token
 import { showNotification } from './ui.js'; // Để hiển thị lỗi
 
-// Dependency (Placeholder - should be managed better)
+// Dependency (Placeholder - Removed, now passed via arguments)
+/*
 const chatContainer = document.getElementById('chatContainer'); // Needed for scrolling
+*/
 
 /**
  * Hàm tiện ích để thực hiện fetch request với Authorization header.
@@ -102,12 +104,13 @@ export async function fetchWithAuth(url, options = {}, expectJson = true) {
  * @param {string} apiUrl The API endpoint URL.
  * @param {object} requestBody The body of the POST request.
  * @param {string} token The authorization Bearer token.
- * @param {HTMLElement} targetContentElement The HTML element whose innerHTML will be updated.
+ * @param {HTMLElement | null} targetContentElement The HTML element whose innerHTML will be updated.
+ * @param {HTMLElement | null} chatContainerElement The chat container element for scrolling.
  * @param {Function} [onComplete] Optional callback upon successful completion. Receives { fullMessage, conversationId, messageId }.
  * @param {Function} [onError] Optional callback on error. Receives the error object.
  * @returns {Promise<{ fullMessage: string, conversationId: string | null, messageId: string | null }>} Resolves with final data or rejects on error.
  */
-export async function handleSseStream(apiUrl, requestBody, token, targetContentElement, onComplete, onError) {
+export async function handleSseStream(apiUrl, requestBody, token, targetContentElement, chatContainerElement, onComplete, onError) {
     let fullMessage = '';
     let latestConversationId = requestBody.conversation_id || null;
     let messageId = null;
@@ -164,8 +167,9 @@ export async function handleSseStream(apiUrl, requestBody, token, targetContentE
                                 if (targetContentElement) {
                                     targetContentElement.innerHTML = renderMarkdown(fullMessage);
                                     highlightCodeBlocks(targetContentElement); // Highlight incrementally
-                                    if (chatContainer) {
-                                        chatContainer.scrollTop = chatContainer.scrollHeight; // Scroll down
+                                    // Use passed chatContainerElement for scrolling
+                                    if (chatContainerElement && chatContainerElement.scrollHeight > chatContainerElement.clientHeight) {
+                                        chatContainerElement.scrollTop = chatContainerElement.scrollHeight;
                                     }
                                 }
                             }
@@ -181,7 +185,7 @@ export async function handleSseStream(apiUrl, requestBody, token, targetContentE
                 }
             }
 
-            // Process remaining buffer content
+            // Process remaining buffer content (if any)
             if (buffer.trim().startsWith('data:')){
                const jsonData = buffer.trim().substring(5).trim();
                 try {
@@ -194,6 +198,10 @@ export async function handleSseStream(apiUrl, requestBody, token, targetContentE
                        if (targetContentElement) {
                            targetContentElement.innerHTML = renderMarkdown(fullMessage);
                            highlightCodeBlocks(targetContentElement);
+                           // Scroll one last time
+                            if (chatContainerElement && chatContainerElement.scrollHeight > chatContainerElement.clientHeight) {
+                                chatContainerElement.scrollTop = chatContainerElement.scrollHeight;
+                            }
                        }
                    }
                     if (currentConvId) latestConversationId = currentConvId;

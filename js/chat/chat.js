@@ -5,18 +5,24 @@ import { showLoading, addMessageToChat, showNotification, hideStaticWelcomeMessa
 import { handleSseStream, fetchWithAuth } from './api.js';
 import { renderMarkdown, highlightCodeBlocks } from './utils.js';
 
-// Dependency (DOM Element - consider passing as argument or getting in main.js)
+// Dependency (DOM Element - Removed, now passed via domElements object)
+/*
 const messageInput = document.getElementById('messageInput');
 const chatContainer = document.getElementById('chatContainer');
 const chatMessagesDiv = document.getElementById('chatMessages'); // Get chat messages div
 const welcomeMessageDiv = document.getElementById('welcomeMessage'); // Get welcome message div
+*/
 
 /**
  * Xử lý việc gửi tin nhắn của người dùng.
+ * @param {object} domElements - Object chứa tham chiếu đến các element DOM (vd: messageInput, chatContainer).
  */
-export async function handleSendMessage() {
-    if (!messageInput || !chatMessagesDiv || !welcomeMessageDiv) {
-        console.error('[chat.js] Missing critical elements (input, chatMessages, welcomeMessage) for sending message.');
+export async function handleSendMessage(domElements) {
+    // Destructure needed elements
+    const { messageInput, chatMessagesDiv, welcomeMessageDiv, chatContainer, /* add other needed elements */ } = domElements;
+
+    if (!messageInput || !chatMessagesDiv || !welcomeMessageDiv || !chatContainer) {
+        console.error('[chat.js] Missing critical elements passed via domElements for sending message.');
         return;
     }
     const messageToSend = messageInput.value.trim();
@@ -61,13 +67,13 @@ export async function handleSendMessage() {
         console.error('[chat.js] Error preparing/sending user message save request:', error);
     }
 
-    // --- Thêm tin nhắn user vào UI và session (như cũ) ---
+    // --- Thêm tin nhắn user vào UI và session (sử dụng domElements) ---
     const userMessageData = {
         content: messageToSend,
         isUser: true,
         timestamp: new Date().toISOString()
     };
-    addMessageToChat(messageToSend, true, false, null, userMessageData.timestamp); // UI only
+    addMessageToChat(messageToSend, chatContainer, true, false, null, userMessageData.timestamp); // Pass chatContainer
     addMessageToCurrentSession(userMessageData); // Add to session state
 
     messageInput.value = '';
@@ -79,9 +85,10 @@ export async function handleSendMessage() {
         updateCurrentSessionTitle(newTitle);
     }
 
-    // --- Bước 2: Gọi AI (Dify) để lấy câu trả lời ---
-    showLoading(true);
-    const aiPlaceholderElement = addMessageToChat(null, false, false, null, null, true);
+    // --- Bước 2: Gọi AI (Dify) để lấy câu trả lời (sử dụng domElements) ---
+    showLoading(true /*, pass loadingIndicator element if ui.js requires it */); // Need to update showLoading call if needed
+    // Pass chatContainer to addMessageToChat
+    const aiPlaceholderElement = addMessageToChat(null, chatContainer, false, false, null, null, true);
     if (chatContainer) chatContainer.scrollTop = chatContainer.scrollHeight;
 
     const difyApiUrl = DIFY_CHAT_API_ENDPOINT;
@@ -99,6 +106,7 @@ export async function handleSendMessage() {
             difyRequestBody,
             difyApiKey,
             aiPlaceholderElement,
+            chatContainer, // Pass chatContainer to handleSseStream
             (result) => {
                 console.log('[chat.js] Dify stream completed. Saving AI message.');
                 const aiPayload = {
@@ -162,24 +170,28 @@ export async function handleSendMessage() {
             }
         }
     } finally {
-        showLoading(false);
+        showLoading(false /*, pass loadingIndicator element if needed */);
     }
 }
 
 /**
  * Fetches and displays the initial welcome message AS THE FIRST MESSAGE in the main chat area.
+ * @param {HTMLElement | null} chatContainerElement - Tham chiếu đến container chat.
+ * @param {HTMLElement | null} welcomeElement - Tham chiếu đến div welcome tĩnh.
+ * @param {HTMLElement | null} chatMessagesElement - Tham chiếu đến div chứa tin nhắn chat.
  */
-export async function showWelcomeMessage() {
+export async function showWelcomeMessage(chatContainerElement, welcomeElement, chatMessagesElement) {
     console.log('[chat.js] Preparing to show dynamic welcome message IN CHAT AREA.');
-    if (!welcomeMessageDiv || !chatMessagesDiv) {
-        console.error('[chat.js] Missing critical elements (welcomeMessage, chatMessages) for showing welcome message.');
+    // Use passed elements
+    if (!welcomeElement || !chatMessagesElement || !chatContainerElement) {
+        console.error('[chat.js] Missing critical elements passed via arguments for showing welcome message.');
         return;
     }
 
     // Hide static welcome, show chat area immediately
-    welcomeMessageDiv.classList.add('hidden');
-    chatMessagesDiv.classList.remove('hidden');
-    chatMessagesDiv.innerHTML = ''; // Clear any previous messages if this is a new chat
+    welcomeElement.classList.add('hidden');
+    chatMessagesElement.classList.remove('hidden');
+    chatMessagesElement.innerHTML = ''; // Clear any previous messages
 
     console.log('[chat.js] Fetching dynamic welcome message from Dify API...');
 
@@ -191,17 +203,17 @@ export async function showWelcomeMessage() {
 
     if (!token || userId === undefined || userId === null) {
         console.error("[chat.js] User info missing for welcome message.");
-        addMessageToChat("Chào bạn! Tôi là Trợ lý Tuyển sinh HUB. (Lỗi xác thực)", false);
+        addMessageToChat("Chào bạn! Tôi là Trợ lý Tuyển sinh HUB. (Lỗi xác thực)", chatContainerElement, false);
         return;
     }
     if (!currentSessId) {
          console.error("[chat.js] Session ID missing for welcome message.");
-         addMessageToChat("Chào bạn! Tôi là Trợ lý Tuyển sinh HUB. (Lỗi phiên làm việc)", false);
+         addMessageToChat("Chào bạn! Tôi là Trợ lý Tuyển sinh HUB. (Lỗi phiên làm việc)", chatContainerElement, false);
          return;
     }
 
-    // Add placeholder in the main chat area
-    const aiPlaceholderElement = addMessageToChat(null, false, false, null, null, true);
+    // Add placeholder in the main chat area (pass chatContainerElement)
+    const aiPlaceholderElement = addMessageToChat(null, chatContainerElement, false, false, null, null, true);
     if (!aiPlaceholderElement) {
         console.error("[chat.js] Failed to create AI placeholder for welcome message.");
         return;
@@ -210,9 +222,10 @@ export async function showWelcomeMessage() {
     const difyApiUrl = DIFY_CHAT_API_ENDPOINT;
     const requestBody = {
         inputs: {},
-        query: 'Bắt đầu cuộc trò chuyện',
+        query: 'Bắt đầu cuộc trò chuyện', // Or a more specific welcome prompt
         response_mode: 'streaming',
         user: String(userId),
+        // conversation_id: null // Explicitly null for a new conversation start for welcome
     };
     console.log('[chat.js] Sending welcome message request to Dify (without specific conversation_id):', requestBody);
 
@@ -222,6 +235,7 @@ export async function showWelcomeMessage() {
             requestBody,
             difyApiKey,
             aiPlaceholderElement,
+            chatContainerElement, // Pass chatContainerElement
             (result) => {
                 console.log('[chat.js] Welcome message stream completed from Dify.', { conversationId: result.conversationId });
                 const fullWelcomeMessage = result.fullMessage || "Chào bạn! Có thể bạn muốn hỏi về tuyển sinh HUB?";
@@ -252,20 +266,35 @@ export async function showWelcomeMessage() {
                 };
                 addMessageToCurrentSession(aiMessageData);
 
-                // --- Update Session Conversation ID --- 
-                if (result.conversationId) {
+                // Update conversationId for the current session based on the welcome message response
+                 if (result.conversationId) {
                     updateCurrentSessionConversationId(result.conversationId);
-                    console.log('[chat.js] Updated session conversationId from Dify welcome response:', result.conversationId);
-                } else {
-                    console.warn('[chat.js] Dify welcome response did not include a conversation_id.');
-                }
+                    console.log('[chat.js] Updated session conversationId from Dify welcome message:', result.conversationId);
+                 }
+                console.log('[chat.js] AI welcome message saved to session state and backend save initiated.');
+
             },
             (error) => {
-                console.error('[chat.js] SSE stream failed for welcome message:', error);
+                console.error('[chat.js] Dify SSE stream failed callback for welcome message:', error);
+                if (aiPlaceholderElement && aiPlaceholderElement.closest) {
+                    const messageContent = aiPlaceholderElement.closest('.message-content');
+                    if(messageContent) {
+                        messageContent.innerHTML = `<div class="markdown-content text-red-600">Xin lỗi, không thể tải tin nhắn chào mừng: ${error.message}</div>`;
+                        const ellipsis = messageContent.querySelector('.ellipsis-animation');
+                        if(ellipsis) ellipsis.remove();
+                    }
+                }
             }
         );
-
     } catch (error) {
-        console.error('[chat.js] showWelcomeMessage caught error during Dify call:', error);
+        console.error('[chat.js] showWelcomeMessage caught error from Dify stream call:', error);
+        if (aiPlaceholderElement && aiPlaceholderElement.closest) {
+            const messageContent = aiPlaceholderElement.closest('.message-content');
+            if(messageContent) {
+                messageContent.innerHTML = `<div class="markdown-content text-red-600">Lỗi khi tải tin nhắn chào mừng: ${error.message}</div>`;
+                const ellipsis = messageContent.querySelector('.ellipsis-animation');
+                if(ellipsis) ellipsis.remove();
+            }
+        }
     }
 }
