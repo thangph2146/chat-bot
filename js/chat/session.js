@@ -446,7 +446,7 @@ async function loadOlderMessages(sessionId, chatContainerElement) {
     }
 
     // --- API Endpoint Assumption ---
-    // Assuming an endpoint like: /api/ChatMessages/session/{sessionId}/before/{oldestMessageId}?count=10
+    // Assuming an endpoint like: /api/ChatMessages/session/{sessionId}/recent?count=10
     // Workaround: Force the correct base path
     const olderMessagesCount = 10;
     const olderMessagesApiUrl = `${CHAT_MESSAGE_API_ENDPOINT}/session/${sessionId}/recent?count=${olderMessagesCount}`;
@@ -463,19 +463,26 @@ async function loadOlderMessages(sessionId, chatContainerElement) {
         }
 
         if (olderMessages.length === 0) {
-            // No more older messages found
-            console.log(`[session.js] No more older messages found for ${sessionId}.`);
+            // No more older messages found by API
+            console.log(`[session.js] No more older messages found via API for ${sessionId}.`);
             targetSession.hasMoreOlder = false;
-            // Remove listener if no more messages? Or just let the hasMoreOlder flag prevent calls.
-            // If using a listener attached to the element, maybe remove it here?
              if (currentScrollListener && chatContainerElement) {
                  chatContainerElement.removeEventListener('scroll', currentScrollListener);
                  currentScrollListener = null; // Clear stored listener
-                 console.log(`[session.js] Removed scroll listener for ${sessionId} as no more older messages.`);
+                 console.log(`[session.js] Removed scroll listener for ${sessionId} as API returned 0 messages.`);
              }
         } else {
-            const mappedOlderMessages = olderMessages.map(apiMsg => {
+            // --- Client-side Filtering START ---
+            // Get IDs of messages already loaded in the client
+            const existingMessageIds = new Set(targetSession.messages.map(m => m.id));
+
+            const newlyFetchedMessages = olderMessages.map(apiMsg => {
                  if (!apiMsg || typeof apiMsg.content === 'undefined') return null;
+                 // Only map messages that are NOT already loaded
+                 if (existingMessageIds.has(apiMsg.id)) {
+                    console.log(`[session.js] Filtering out already loaded message ID: ${apiMsg.id}`);
+                    return null;
+                 }
                  return {
                      id: apiMsg.id,
                      senderName: apiMsg.senderName || (apiMsg.isUser ? 'Người dùng' : 'Bot'),
@@ -485,50 +492,60 @@ async function loadOlderMessages(sessionId, chatContainerElement) {
                  };
              }).filter(msg => msg !== null)
                .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+            // --- Client-side Filtering END ---
 
-            // Store the scroll height before adding new messages
-            const previousScrollHeight = chatContainerElement.scrollHeight;
-            const previousScrollTop = chatContainerElement.scrollTop;
-
-
-            // Prepend the newly fetched older messages to the session's array
-            targetSession.messages.unshift(...mappedOlderMessages);
-
-            // Update the oldest message ID for the next potential fetch
-            targetSession.oldestMessageId = mappedOlderMessages[0].id;
-            console.log(`[session.js] Updated oldestMessageId to ${targetSession.oldestMessageId}`);
-
-
-            // Prepend the new message elements to the chat container using the render function
-            const fragment = document.createDocumentFragment();
-            mappedOlderMessages.forEach(msg => {
-                const messageElement = renderMessageElement(msg); // Use the refactored function
-                fragment.appendChild(messageElement);
-            });
-            // Remove the loading indicator *before* prepending new content
-            if (loadingIndicator) {
-                loadingIndicator.remove();
-                loadingIndicator = null; // Clear the reference
-            }
-            chatContainerElement.prepend(fragment); // Prepend the new messages
-
-
-            // Maintain scroll position: scrollTop should increase by the height difference
-            const newScrollHeight = chatContainerElement.scrollHeight;
-            chatContainerElement.scrollTop = previousScrollTop + (newScrollHeight - previousScrollHeight);
-             console.log(`[session.js] Prepended ${mappedOlderMessages.length} older messages. Adjusted scroll.`);
-
-
-            // If fewer messages were returned than requested, assume no more older messages
-            if (mappedOlderMessages.length < olderMessagesCount) {
-                console.log(`[session.js] Older messages load returned fewer than requested (${mappedOlderMessages.length}/${olderMessagesCount}). Setting hasMoreOlder=false.`);
+            // Check if any *new* older messages were actually found after filtering
+            if (newlyFetchedMessages.length === 0) {
+                console.log(`[session.js] No *new* older messages found after filtering for ${sessionId}. End reached or API repeating.`);
                 targetSession.hasMoreOlder = false;
-                // Remove listener
                  if (currentScrollListener && chatContainerElement) {
                      chatContainerElement.removeEventListener('scroll', currentScrollListener);
                      currentScrollListener = null;
-                     console.log(`[session.js] Removed scroll listener for ${sessionId} as likely no more older messages.`);
+                     console.log(`[session.js] Removed scroll listener for ${sessionId} as no new messages found after filtering.`);
                  }
+            } else {
+                // Store the scroll height before adding new messages
+                const previousScrollHeight = chatContainerElement.scrollHeight;
+                const previousScrollTop = chatContainerElement.scrollTop;
+
+                // Prepend ONLY the newly fetched older messages to the session's array
+                targetSession.messages.unshift(...newlyFetchedMessages);
+
+                // Update the oldest message ID based on the *newly added* messages
+                // This ensures the next 'loadOlder' (if needed) starts from the right place *theoretically*
+                // although the current API won't use it.
+                targetSession.oldestMessageId = newlyFetchedMessages[0].id;
+                console.log(`[session.js] Updated oldestMessageId to ${targetSession.oldestMessageId} based on newly added messages.`);
+
+                // Prepend ONLY the new message elements to the chat container
+                const fragment = document.createDocumentFragment();
+                newlyFetchedMessages.forEach(msg => {
+                    const messageElement = renderMessageElement(msg); // Use the refactored function
+                    fragment.appendChild(messageElement);
+                });
+                // Remove the loading indicator *before* prepending new content
+                if (loadingIndicator) {
+                    loadingIndicator.remove();
+                    loadingIndicator = null; // Clear the reference
+                }
+                chatContainerElement.prepend(fragment); // Prepend the new messages
+
+                // Maintain scroll position: scrollTop should increase by the height difference
+                const newScrollHeight = chatContainerElement.scrollHeight;
+                chatContainerElement.scrollTop = previousScrollTop + (newScrollHeight - previousScrollHeight);
+                console.log(`[session.js] Prepended ${newlyFetchedMessages.length} new older messages. Adjusted scroll.`);
+
+                // Check if the API returned fewer messages than requested OR if filtering removed messages
+                // This indicates the end of available history from the API's perspective
+                if (olderMessages.length < olderMessagesCount || newlyFetchedMessages.length < olderMessages.length) {
+                    console.log(`[session.js] Setting hasMoreOlder=false. API returned ${olderMessages.length}/${olderMessagesCount}, ${newlyFetchedMessages.length} were new.`);
+                    targetSession.hasMoreOlder = false;
+                    if (currentScrollListener && chatContainerElement) {
+                        chatContainerElement.removeEventListener('scroll', currentScrollListener);
+                        currentScrollListener = null;
+                        console.log(`[session.js] Removed scroll listener for ${sessionId} as end likely reached.`);
+                    }
+                }
             }
         }
 
