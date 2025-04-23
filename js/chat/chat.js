@@ -87,8 +87,7 @@ export async function handleSendMessage(domElements) {
         inputs: {},
         query: messageToSend,
         response_mode: 'streaming',
-        user: "Trưởng phòng CNTT HUB",
-        // user: String(userId),
+        user: String(userId),
         conversation_id: latestConversationId
     };
 
