@@ -3,12 +3,10 @@ import { checkAuthentication } from '../chat/auth.js';
 
 // *** Redirect if already logged in ***
 if (checkAuthentication()) {
-    console.log("[register-page.js] User already logged in. Redirecting to index.html...");
     window.location.href = 'index.html'; // Or your main chat page path
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    console.log("[register-page.js] DOMContentLoaded event fired.");
     const registerForm = document.getElementById('registerForm');
     const fullNameInput = document.getElementById('fullName');
     const emailInput = document.getElementById('email');
@@ -30,7 +28,6 @@ document.addEventListener('DOMContentLoaded', () => {
         console.error("[register-page.js] Register page UI elements (including modal) not found. Initialization failed.");
         return;
     }
-    console.log("[register-page.js] All required UI elements found.");
 
     // Đảm bảo hàm handleRegister đã được tải
     if (typeof handleRegister !== 'function') {
@@ -40,11 +37,9 @@ document.addEventListener('DOMContentLoaded', () => {
         submitButton.disabled = true;
         return;
     }
-    console.log("[register-page.js] handleRegister function is available.");
 
     // Hàm hiển thị modal
     function showSuccessModal() {
-        console.log("[register-page.js] Showing success modal.");
         if (!successModal || !modalContent) return;
         successModal.classList.remove('hidden');
         // Trigger reflow để animation hoạt động
@@ -65,12 +60,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Gắn sự kiện cho nút OK trên modal
     modalOkButton.addEventListener('click', () => {
-        console.log("[register-page.js] OK button on modal clicked. Redirecting to login.html...");
         window.location.href = 'login.html'; // Chuyển hướng đến trang đăng nhập
     });
 
     registerForm.addEventListener('submit', async function(event) {
-        console.log("[register-page.js] Register form submitted.");
         event.preventDefault();
 
         const fullName = fullNameInput.value.trim();
@@ -82,7 +75,6 @@ document.addEventListener('DOMContentLoaded', () => {
         errorTextElement.textContent = '';
 
         // --- Validation ---
-        console.log("[register-page.js] Performing validation...");
         if (!fullName || !email || !password || !confirmPassword) {
             errorTextElement.textContent = 'Vui lòng nhập đầy đủ thông tin.';
             errorMessageDiv.style.display = 'flex';
@@ -111,10 +103,8 @@ document.addEventListener('DOMContentLoaded', () => {
             setTimeout(() => registerForm.classList.remove('animate-shake'), 500);
             return;
         }
-        console.log("[register-page.js] Validation passed.");
 
         // --- Xử lý trạng thái chờ ---
-        console.log("[register-page.js] Setting register button to loading state.");
         submitButton.disabled = true;
         buttonText.textContent = 'Đang xử lý...';
         buttonSpinner.classList.remove('hidden');
@@ -122,9 +112,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // --- Gọi hàm đăng ký (API) từ js/register.js ---
         try {
-            console.log("[register-page.js] Calling handleRegister from register.js...");
             const registrationResult = await handleRegister(fullName, email, password, confirmPassword);
-            console.log("[register-page.js] handleRegister result:", registrationResult);
 
             if (registrationResult.success) {
                  // Thay vì alert, hiển thị modal
@@ -210,5 +198,4 @@ document.addEventListener('DOMContentLoaded', () => {
     if (copyrightYearElement) {
         copyrightYearElement.textContent = new Date().getFullYear();
     }
-    console.log("[register-page.js] DOMContentLoaded handler finished.");
 }); 

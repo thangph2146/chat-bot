@@ -29,7 +29,6 @@ let chatSessions = []; // Example: Will be populated by session logic
  * @param {HTMLElement | null} recordButtonElement - Tham chiếu đến nút ghi âm.
  */
 export function updateRecordingUI(isRecording, recordButtonElement) {
-    console.log('[ui.js] Updating recording UI, isRecording:', isRecording);
     if (!recordButtonElement) {
          console.warn('[ui.js] updateRecordingUI: recordButtonElement not provided.');
          return;
@@ -50,7 +49,6 @@ export function updateRecordingUI(isRecording, recordButtonElement) {
  * @param {HTMLElement | null} welcomeElement - Tham chiếu đến div welcome message.
  */
 export function hideStaticWelcomeMessage(welcomeElement) {
-    console.log('[ui.js] Hiding static welcome message.');
     if (welcomeElement) {
         welcomeElement.classList.add('hidden');
     }
@@ -62,7 +60,6 @@ export function hideStaticWelcomeMessage(welcomeElement) {
  * @param {HTMLElement | null} loadingElement - Tham chiếu đến chỉ báo loading.
  */
 export function showLoading(show, loadingElement) {
-    console.log('[ui.js] Setting loading indicator visibility:', show);
     if (loadingElement) {
         loadingElement.style.display = show ? 'flex' : 'none';
     }
@@ -80,7 +77,6 @@ export function showLoading(show, loadingElement) {
  * @returns {HTMLElement | null} Phần tử chứa nội dung tin nhắn (để cập nhật khi streaming) hoặc null.
  */
 export function addMessageToChat(message, chatContainerElement, isUser = false, save = true, customId = null, timestamp = null, isStreaming = false) {
-    console.log(`%c[ui.js] addMessageToChat CALLED (Refactored). User: ${isUser}, Streaming: ${isStreaming}, ID: ${customId || '(auto)'}`, 'color: blue; font-weight: bold;');
     if (!chatContainerElement) {
         console.error('[ui.js] addMessageToChat: chatContainerElement not provided!');
         return null;
@@ -107,7 +103,6 @@ export function addMessageToChat(message, chatContainerElement, isUser = false, 
 
     // --- Append and scroll ---
     chatContainerElement.appendChild(messageElement);
-    console.log(`[ui.js]   -> Appended message element (via renderMessageElement) to chatContainer. Child count: ${chatContainerElement.childElementCount}`);
 
     // Scroll to bottom
     setTimeout(() => {
@@ -146,16 +141,13 @@ export function addMessageToChat(message, chatContainerElement, isUser = false, 
                 // Nếu là bot đang streaming, tìm div .markdown-content bên trong .message-text-content
                 const markdownContentElement = textContentElement.querySelector('.markdown-content');
                 if (markdownContentElement) {
-                    console.log('[ui.js] Returning .markdown-content for streaming update.');
                     return markdownContentElement;
                 } else {
-                    console.warn('[ui.js] Could not find .markdown-content inside .message-text-content for streaming.');
                     return textContentElement; // Fallback: trả về container text
                 }
             } else {
                  // Nếu là tin nhắn user hoặc bot đã hoàn thành, trả về container text chính
                  // (Mặc dù việc cập nhật user message thường không cần thiết)
-                 // console.log('[ui.js] Returning .message-text-content for non-streaming or user message.');
                  // return textContentElement;
                  // -> Quyết định: Trả về null vì handleSseStream chỉ cần phần tử cho streaming
                  return null;
@@ -163,7 +155,6 @@ export function addMessageToChat(message, chatContainerElement, isUser = false, 
         }
     }
 
-    console.warn('[ui.js] Could not find bubble or text content element to return for updates.');
     return null; // Fallback an toàn
 }
 
@@ -179,7 +170,6 @@ export function addMessageToChat(message, chatContainerElement, isUser = false, 
  * @param {HTMLElement | null} chatMessagesElement - Tham chiếu đến div chứa tin nhắn chat.
  */
 export function updateHistorySidebar(sessions, currentId, onSelect, onDelete, historySessionsElement, chatContainerElement, welcomeElement, chatMessagesElement) {
-    console.log(`[ui.js] Updating history sidebar. Sessions count: ${sessions?.length}, Current ID: ${currentId}`);
     if (!historySessionsElement) {
         console.error('[ui.js] updateHistorySidebar: historySessionsElement not provided!');
         return;
@@ -187,7 +177,6 @@ export function updateHistorySidebar(sessions, currentId, onSelect, onDelete, hi
     historySessionsElement.innerHTML = '';
 
     if (!sessions || sessions.length === 0) {
-        console.log('[ui.js] No sessions to display in sidebar.');
         // Optionally display a message here if needed
         return;
     }
@@ -203,7 +192,6 @@ export function updateHistorySidebar(sessions, currentId, onSelect, onDelete, hi
             console.warn(`[ui.js] Skipping invalid session data at index ${index}:`, session);
             return;
         }
-        console.log(`[ui.js] Processing session for sidebar: ID=${session.id}, Title=${session.title}`);
 
         const historyItem = document.createElement('div');
         historyItem.className = 'history-item group flex cursor-pointer items-center rounded-lg p-3 transition-all hover:bg-secondary-100';
@@ -240,19 +228,17 @@ export function updateHistorySidebar(sessions, currentId, onSelect, onDelete, hi
         historyItem.addEventListener('click', async (e) => {
             if (e.target.closest('.delete-session-btn')) return;
             const clickedSessionId = historyItem.dataset.sessionId;
-            console.log(`[ui.js] History item clicked: ${clickedSessionId}`);
             // Check if currentId is defined before comparing
             if (typeof currentId === 'undefined' || clickedSessionId !== currentId) { 
                 if (onSelect) {
                     try {
-                        console.log(`[ui.js] Calling onSelect handler for ${clickedSessionId}`);
                         await onSelect(clickedSessionId, historySessionsElement, chatContainerElement, welcomeElement, chatMessagesElement);
                     } catch (selectError) {
                         console.error('[ui.js] Error calling onSelect handler:', selectError);
                     }
                 }
             } else {
-                 console.log(`[ui.js] Clicked on the currently active session (${clickedSessionId}), no action needed.`);
+                 // Do nothing
             }
             // Close sidebar on mobile after selection regardless of whether it was active
             if (window.innerWidth < 768) {
@@ -264,10 +250,8 @@ export function updateHistorySidebar(sessions, currentId, onSelect, onDelete, hi
         deleteButton?.addEventListener('click', (e) => {
             e.stopPropagation();
             const sessionIdToDelete = e.currentTarget.dataset.sessionId;
-             console.log(`[ui.js] Delete button clicked for session: ${sessionIdToDelete}`);
             if (onDelete) {
                  try {
-                     console.log(`[ui.js] Calling onDelete handler for ${sessionIdToDelete}`);
                      onDelete(sessionIdToDelete, historySessionsElement, chatContainerElement, welcomeElement, chatMessagesElement);
                  } catch (deleteError) {
                      console.error('[ui.js] Error calling onDelete handler:', deleteError);
@@ -277,7 +261,6 @@ export function updateHistorySidebar(sessions, currentId, onSelect, onDelete, hi
 
         historySessionsElement.appendChild(historyItem);
     });
-     console.log('[ui.js] Finished updating history sidebar.');
 }
 
 /**
@@ -287,7 +270,6 @@ export function updateHistorySidebar(sessions, currentId, onSelect, onDelete, hi
  * @param {object} domElements - Object containing references to key DOM elements.
  */
 export function loadSessionUI(session, showWelcomeFn, domElements) {
-    console.log(`[ui.js] Loading UI for session: ${session?.id}`);
     const chatContainerElement = domElements?.chatContainer;
     const welcomeElement = domElements?.welcomeMessageDiv;
     const chatMessagesElement = domElements?.chatMessagesDiv; // Assuming this is the parent
@@ -302,7 +284,6 @@ export function loadSessionUI(session, showWelcomeFn, domElements) {
     chatContainerElement.scrollTop = chatContainerElement.scrollHeight; // Scroll to bottom initially
 
     if (!session || !session.messages || session.messages.length === 0) {
-        console.log('[ui.js] Session is empty. Preparing chat area for dynamic welcome message.');
         // --- THAY ĐỔI LOGIC --- 
         // 1. Ẩn màn hình chào mừng tĩnh
         welcomeElement.classList.add('hidden');
@@ -314,7 +295,6 @@ export function loadSessionUI(session, showWelcomeFn, domElements) {
         // if (showWelcomeFn) { ... } // <<< BỎ ĐI
 
     } else {
-        console.log(`[ui.js] Session ${session.id} has ${session.messages.length} messages. Rendering...`);
         welcomeElement.classList.add('hidden');
         chatMessagesElement.classList.remove('items-center', 'justify-center'); // Remove centering
         chatContainerElement.classList.remove('hidden');
@@ -331,12 +311,10 @@ export function loadSessionUI(session, showWelcomeFn, domElements) {
             }
         });
         chatContainerElement.appendChild(fragment);
-        console.log(`[ui.js]   -> Appended ${fragment.childElementCount} message elements.`);
 
         // Scroll to bottom after rendering initial messages
         setTimeout(() => {
             chatContainerElement.scrollTop = chatContainerElement.scrollHeight;
-            console.log('[ui.js] Scrolled to bottom after initial message load.');
         }, 0); // Timeout to allow DOM updates
 
         // Highlight code blocks after adding messages to DOM
@@ -416,7 +394,6 @@ export function showDeleteSessionDialog(sessionTitle, onConfirm) {
              modalContent.classList.add('scale-100', 'opacity-100');
          }
     });
-     console.log('[ui.js] Delete session confirmation dialog shown.');
 }
 
 /**
@@ -505,6 +482,4 @@ export function showNotification(message, type = 'info', duration = 3000) {
 
     // Auto remove after duration
     setTimeout(removeNotification, duration);
-
-    console.log(`[ui.js] Notification shown: ${message} (Type: ${type})`);
 }

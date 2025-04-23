@@ -28,7 +28,6 @@ export async function handleRegister(fullName, email, password, confirmPassword)
             headers: { 'Authorization': undefined } // Explicitly remove Authorization header if fetchWithAuth adds it by default
         });
 
-        console.log('API Register Success:', email);
         return { success: true };
 
     } catch (error) {

@@ -42,8 +42,6 @@ export async function fetchWithAuth(url, options = {}, expectJson = true) {
         requestOptions.body = JSON.stringify(requestOptions.body);
     }
 
-    console.log(`[api.js] fetchWithAuth: ${requestOptions.method || 'GET'} ${url}`, requestOptions);
-
     try {
         const response = await fetch(url, requestOptions);
 
@@ -72,12 +70,10 @@ export async function fetchWithAuth(url, options = {}, expectJson = true) {
         // Xử lý phản hồi thành công
         if (expectJson) {
             if (response.headers.get('content-length') === '0' || response.status === 204) {
-                 console.log(`[api.js] fetchWithAuth: Received empty JSON response (status ${response.status}) for ${url}.`);
                  return null; // Trả về null cho response rỗng
             }
             try {
                  const jsonData = await response.json();
-                 console.log(`[api.js] fetchWithAuth: Success (JSON) for ${url}`, jsonData);
                  return jsonData;
             } catch (jsonError) {
                 console.error(`[api.js] fetchWithAuth: Error parsing JSON response for ${url}:`, jsonError);
@@ -85,7 +81,6 @@ export async function fetchWithAuth(url, options = {}, expectJson = true) {
             }
         } else {
             const textData = await response.text();
-            console.log(`[api.js] fetchWithAuth: Success (Text) for ${url}`, textData);
             return textData;
         }
 
@@ -119,7 +114,6 @@ export async function handleSseStream(apiUrl, requestBody, token, targetContentE
 
     return new Promise(async (resolve, reject) => {
         try {
-            console.log(`Sending SSE request to ${apiUrl}`, requestBody);
             const response = await fetch(apiUrl, {
                 method: 'POST',
                 headers: {
@@ -142,7 +136,6 @@ export async function handleSseStream(apiUrl, requestBody, token, targetContentE
             while (true) {
                 const { value, done } = await reader.read();
                 if (done) {
-                    console.log('SSE Stream finished.');
                     break;
                 }
 

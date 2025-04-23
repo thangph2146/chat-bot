@@ -5,13 +5,11 @@ import { GOOGLE_CLIENT_ID } from '../chat/config.js'; // Chỉ import Client ID
 
 // *** Redirect if already logged in ***
 if (checkAuthentication()) {
-    console.log("[login-page.js] User already logged in. Redirecting to index.html...");
     window.location.href = 'index.html'; // Or your main chat page path
 }
 
 // --- Hàm Callback từ Google Sign-In --- 
 async function handleGoogleCredentialResponse(response) {
-    console.log("[login-page.js] Received Google Credential Response");
     const idToken = response.credential;
 
     // --- Không cần giải mã idToken ở client nữa ---
@@ -40,7 +38,6 @@ async function handleGoogleCredentialResponse(response) {
     errorTextElement.textContent = '';
 
     // --- Hiển thị trạng thái chờ --- 
-    console.log("[login-page.js] Setting Google button div to loading state.");
     googleSignInButtonDiv.style.opacity = '0.6';
     googleSignInButtonDiv.style.pointerEvents = 'none';
     errorTextElement.textContent = 'Đang xác thực với máy chủ...';
@@ -49,14 +46,11 @@ async function handleGoogleCredentialResponse(response) {
     errorMessageDiv.classList.add('text-blue-600'); // Màu xanh thông báo
 
     try {
-        console.log("[login-page.js] Calling handleGoogleVerifyToken with idToken...");
         // Gọi hàm trong login.js để gửi idToken về backend
         const verificationResult = await handleGoogleVerifyToken(idToken);
-        console.log("[login-page.js] handleGoogleVerifyToken result:", verificationResult);
 
         if (verificationResult.success) {
             errorMessageDiv.style.display = 'none';
-            console.log("[login-page.js] Google sign-in successful. Redirecting to index.html...");
             window.location.href = 'index.html'; // Chuyển hướng khi thành công
         } else {
             // Lỗi từ backend (đã xác thực hoặc lỗi khác)
@@ -75,7 +69,6 @@ async function handleGoogleCredentialResponse(response) {
         errorMessageDiv.style.display = 'flex';
     } finally {
         // --- Khôi phục trạng thái nút Google --- 
-        console.log("[login-page.js] Restoring Google button div state.");
         googleSignInButtonDiv.style.opacity = '1';
         googleSignInButtonDiv.style.pointerEvents = 'auto';
         // Chỉ ẩn thông báo loading màu xanh, giữ lại nếu có lỗi màu đỏ
@@ -86,7 +79,6 @@ async function handleGoogleCredentialResponse(response) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    console.log("[login-page.js] DOMContentLoaded event fired.");
     const loginForm = document.getElementById('loginForm');
     const emailInput = document.getElementById('email');
     const passwordInput = document.getElementById('password');
@@ -108,7 +100,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         return;
     }
-    console.log("[login-page.js] All required UI elements found.");
 
     // Đảm bảo hàm handleLogin và handleGoogleVerifyToken đã được tải
     if (typeof handleLogin !== 'function' || typeof handleGoogleVerifyToken !== 'function') { // Kiểm tra hàm mới
@@ -119,12 +110,10 @@ document.addEventListener('DOMContentLoaded', () => {
         // Không cần disable nút Google vì nó được quản lý bởi thư viện
         return;
     }
-    console.log("[login-page.js] handleLogin and handleGoogleVerifyToken functions are available.");
 
     // --- Khởi tạo Google Sign In --- 
     // Đặt trong window.onload để đảm bảo thư viện gsi đã tải xong và GOOGLE_CLIENT_ID đã sẵn sàng
     window.onload = function () {
-      console.log("[login-page.js] window.onload event fired, initializing Google Sign-In...");
       if (typeof google === 'undefined' || !google.accounts || !google.accounts.id) {
           console.error("[login-page.js] Google Identity Services library (gsi) not loaded.");
           if (errorTextElement && errorMessageDiv) {
@@ -146,14 +135,12 @@ document.addEventListener('DOMContentLoaded', () => {
           client_id: GOOGLE_CLIENT_ID, 
           callback: handleGoogleCredentialResponse // Hàm sẽ được gọi sau khi đăng nhập Google thành công
         });
-        console.log("[login-page.js] Google Sign-In initialized.");
         
         // Render nút đăng nhập Google vào div đã chuẩn bị
         google.accounts.id.renderButton(
           googleSignInButtonDiv, // Element div để render nút vào
           { theme: "outline", size: "large", type: "standard", text: "signin_with", shape: "rectangular", logo_alignment: "left" }  // Tùy chỉnh giao diện nút
         );
-        console.log("[login-page.js] Google Sign-In button rendered.");
         
         // Tùy chọn: Hiển thị One Tap prompt (đăng nhập nhanh nếu đã từng đăng nhập)
         // google.accounts.id.prompt(); 
@@ -168,7 +155,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Xử lý Submit Form Email/Password (giữ nguyên logic cũ) --- 
     loginForm.addEventListener('submit', async function(event) {
-        console.log("[login-page.js] Login form submitted.");
         event.preventDefault();
 
         const email = emailInput.value.trim().toLowerCase();
@@ -183,20 +169,16 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        console.log("[login-page.js] Setting login button to loading state.");
         submitButton.disabled = true;
         buttonText.textContent = 'Đang xử lý...';
         buttonSpinner.classList.remove('hidden');
 
         try {
-            console.log("[login-page.js] Calling handleLogin from login.js...");
             const loginResult = await handleLogin(email, password);
-            console.log("[login-page.js] handleLogin result:", loginResult);
 
             if (loginResult.success) {
                 errorMessageDiv.style.display = 'none';
                 buttonText.textContent = 'Thành công!';
-                console.log("[login-page.js] Standard login successful. Redirecting to index.html...");
                 window.location.href = 'index.html';
             } else {
                 console.error("[login-page.js] Standard login failed:");
@@ -247,12 +229,10 @@ document.addEventListener('DOMContentLoaded', () => {
         `;
         document.head.appendChild(styleSheet);
     }
-    console.log("[login-page.js] Shake animation logic setup.");
 
     // Cập nhật năm bản quyền (giữ nguyên)
     const copyrightYearElement = document.getElementById('copyrightYear');
     if (copyrightYearElement) {
         copyrightYearElement.textContent = new Date().getFullYear();
     }
-    console.log("[login-page.js] DOMContentLoaded handler finished.");
 }); 

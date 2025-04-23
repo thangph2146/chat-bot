@@ -35,7 +35,6 @@ export function initSpeechRecognition(messageInputElement, recordButtonElement) 
     recognition.maxAlternatives = 1;
 
     recognition.onstart = () => {
-        console.log('Voice recording started');
         isRecording = true;
         isProcessingVoice = true;
         // Pass recordButtonElement to updateRecordingUI

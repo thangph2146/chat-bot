@@ -10,7 +10,6 @@ import { showNotification } from '../chat/ui.js'; // Import showNotification for
  * @returns {Promise<{success: boolean, message?: string}>}
  */
 export async function handleLogin(email, password) {
-    console.log(`[login.js] Attempting login for email: ${email}`);
     const apiUrl = AUTH_LOGIN_ENDPOINT;
     const requestBody = {
         email: email,
@@ -24,7 +23,6 @@ export async function handleLogin(email, password) {
             body: requestBody // fetchWithAuth sẽ tự stringify nếu cần
         });
 
-        console.log('[login.js] API Login Success Data Received:', responseData);
 
         // Validation cấu trúc response (điều chỉnh nếu API trả về khác)
         if (!responseData || !responseData.data || !responseData.data.token || typeof responseData.data.userId === 'undefined') {
@@ -33,9 +31,7 @@ export async function handleLogin(email, password) {
         }
 
         try {
-            console.log(`[login.js] Storing user data to localStorage with key: ${USER_DATA_KEY}`);
             localStorage.setItem(USER_DATA_KEY, JSON.stringify(responseData));
-            console.log('[login.js] User data stored successfully.');
             return { success: true };
         } catch (storageError) {
             console.error('[login.js] Error storing login info to localStorage:', storageError);
@@ -59,7 +55,6 @@ export async function handleLogin(email, password) {
  * @returns {Promise<{success: boolean, message?: string}>}
  */
 export async function handleGoogleVerifyToken(idToken) {
-    console.log('[login.js] Sending idToken to backend for verification...');
     const apiUrl = AUTH_GOOGLE_VERIFY_ENDPOINT;
     const requestBody = { idToken: idToken };
 
@@ -75,7 +70,6 @@ export async function handleGoogleVerifyToken(idToken) {
             // headers: { 'Authorization': undefined } 
         });
 
-        console.log('[login.js] Backend verification response:', responseData);
 
         // Kiểm tra cấu trúc response thành công từ backend
         if (!responseData || !responseData.data || !responseData.data.token || typeof responseData.data.userId === 'undefined') {
@@ -88,7 +82,6 @@ export async function handleGoogleVerifyToken(idToken) {
         // Đăng nhập thành công từ backend
         try {
             localStorage.setItem(USER_DATA_KEY, JSON.stringify(responseData));
-            console.log('[login.js] User data from Google sign-in stored successfully.');
             return { success: true };
         } catch (storageError) {
             console.error('[login.js] Error storing verified Google login info to localStorage:', storageError);

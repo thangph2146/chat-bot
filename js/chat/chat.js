@@ -49,7 +49,6 @@ export async function handleSendMessage(domElements) {
         content: messageToSend
     };
     try {
-        console.log('[chat.js] Saving user message to backend:', userPayload);
         fetchWithAuth(SAVE_MESSAGE_ENDPOINT, {
             method: 'POST',
             body: userPayload
@@ -93,7 +92,6 @@ export async function handleSendMessage(domElements) {
             aiPlaceholderElement,
             chatContainer, // Pass chatContainer to handleSseStream
             (result) => {
-                console.log('[chat.js] Dify stream completed. Saving AI message.');
                 const aiMessageContent = result.fullMessage ? result.fullMessage.trim() : ""; // Trim whitespace
 
                 // --- Tìm và xóa hiệu ứng typing --- 
@@ -104,7 +102,6 @@ export async function handleSendMessage(domElements) {
                         const ellipsis = messageBubble.querySelector('.ellipsis-animation');
                         if (ellipsis) {
                             ellipsis.remove();
-                            console.log('[chat.js][onComplete] Removed ellipsis animation.');
                         }
                     }
                 }
@@ -119,7 +116,6 @@ export async function handleSendMessage(domElements) {
                         content: aiMessageContent // Sử dụng nội dung đã trim
                     };
                     try {
-                        console.log('[chat.js] Saving AI message to backend:', aiPayload);
                         fetchWithAuth(SAVE_MESSAGE_ENDPOINT, {
                             method: 'POST',
                             body: aiPayload
@@ -136,7 +132,6 @@ export async function handleSendMessage(domElements) {
                     };
                     addMessageToCurrentSession(aiMessageData, domElements); // Add domElements argument
 
-                    console.log('[chat.js] AI message save initiated and added to session state.');
 
                 } else {
                     console.warn('[chat.js] Dify stream completed but result.fullMessage was empty. Skipping AI message save.');
@@ -155,7 +150,6 @@ export async function handleSendMessage(domElements) {
                 if (result.conversationId && result.conversationId !== latestConversationId) {
                      latestConversationId = result.conversationId;
                      updateCurrentSessionConversationId(latestConversationId);
-                     console.log('[chat.js] Updated session conversationId from Dify:', latestConversationId);
                 }
             },
             (error) => {
@@ -174,7 +168,6 @@ export async function handleSendMessage(domElements) {
         if (result && result.conversationId && result.conversationId !== latestConversationId) {
             latestConversationId = result.conversationId;
             updateCurrentSessionConversationId(latestConversationId);
-            console.log('[chat.js] Updated session conversationId after Dify stream completion:', latestConversationId);
         }
 
     } catch (error) {
@@ -200,7 +193,6 @@ export async function handleSendMessage(domElements) {
  * @param {object} domElements - Object chứa tham chiếu đến các element DOM.
  */
 export async function showWelcomeMessage(domElements) {
-    console.log('[chat.js] Preparing to show dynamic welcome message IN CHAT AREA.');
     // Destructure elements from domElements
     const { chatContainer, welcomeMessageDiv, chatMessagesDiv } = domElements;
 
@@ -215,7 +207,6 @@ export async function showWelcomeMessage(domElements) {
     chatMessagesDiv.classList.remove('hidden');
     chatMessagesDiv.innerHTML = ''; // Clear any previous messages
 
-    console.log('[chat.js] Fetching dynamic welcome message from Dify API...');
 
     const userInfo = getUserInfo();
     const token = userInfo?.data?.token;
@@ -249,7 +240,6 @@ export async function showWelcomeMessage(domElements) {
         user: String(userId),
         // conversation_id: null // Explicitly null for a new conversation start for welcome
     };
-    console.log('[chat.js] Sending welcome message request to Dify (without specific conversation_id):', requestBody);
 
     try {
         await handleSseStream(
@@ -259,7 +249,6 @@ export async function showWelcomeMessage(domElements) {
             aiPlaceholderElement,
             chatContainer, // Pass chatContainer
             (result) => {
-                console.log('[chat.js] Welcome message stream completed from Dify.', { conversationId: result.conversationId });
                 const fullWelcomeMessage = result.fullMessage || "Chào bạn! Có thể bạn muốn hỏi về tuyển sinh HUB?";
 
                 // --- Tìm và xóa hiệu ứng typing --- 
@@ -269,7 +258,6 @@ export async function showWelcomeMessage(domElements) {
                         const ellipsis = messageBubble.querySelector('.ellipsis-animation');
                         if (ellipsis) {
                             ellipsis.remove();
-                            console.log('[chat.js][onComplete-Welcome] Removed ellipsis animation.');
                         }
                     }
                 }
@@ -283,7 +271,6 @@ export async function showWelcomeMessage(domElements) {
                     content: fullWelcomeMessage
                 };
                 try {
-                    console.log('[chat.js] Saving AI welcome message to backend:', aiPayload);
                     fetchWithAuth(SAVE_MESSAGE_ENDPOINT, { method: 'POST', body: aiPayload }, false)
                     .catch(saveError => {
                         console.error('[chat.js] Failed to save AI welcome message to backend:', saveError);
@@ -305,9 +292,7 @@ export async function showWelcomeMessage(domElements) {
                 // Update conversationId for the current session based on the welcome message response
                  if (result.conversationId) {
                     updateCurrentSessionConversationId(result.conversationId);
-                    console.log('[chat.js] Updated session conversationId from Dify welcome message:', result.conversationId);
                  }
-                console.log('[chat.js] AI welcome message saved to session state and backend save initiated.');
 
             },
             (error) => {
