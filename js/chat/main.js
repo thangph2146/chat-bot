@@ -12,7 +12,8 @@ import {
     getAllSessions,
     getCurrentSessionId,
     handleSelectSession,
-    handleDeleteRequest
+    handleDeleteRequest,
+    loadSessionMessages
 } from './session.js';
 import {
     handleSendMessage,
@@ -70,16 +71,21 @@ document.addEventListener('DOMContentLoaded', async () => {
         const sessions = getAllSessions();
         const initialSessionId = getCurrentSessionId();
         console.log(`[main.js] Load successful. Sessions count: ${sessions?.length}, Initial Session ID: ${initialSessionId}`);
-        if (sessions && sessions.length > 0) {
-             console.log('[main.js] ---> Calling updateHistorySidebar...');
-             updateHistorySidebar(sessions, initialSessionId, handleSelectSession, handleDeleteRequest);
-             console.log('[main.js] <--- updateHistorySidebar finished.');
-             console.log('[main.js] ---> Calling showWelcomeMessage...');
-             showWelcomeMessage();
-             console.log('[main.js] <--- showWelcomeMessage finished.');
+        
+        // Luôn cập nhật sidebar trước
+        updateHistorySidebar(sessions, initialSessionId, handleSelectSession, handleDeleteRequest);
+        console.log('[main.js] History sidebar updated.');
+
+        if (initialSessionId) {
+            // Nếu có session ban đầu, tải tin nhắn cho nó
+            console.log(`[main.js] ---> Calling loadSessionMessages for initial session: ${initialSessionId}`);
+            await loadSessionMessages(initialSessionId); // <<< Gọi loadSessionMessages thay vì showWelcomeMessage
+            console.log(`[main.js] <--- loadSessionMessages for initial session finished.`);
         } else {
-             console.log('[main.js] loadChatSessions succeeded but returned 0 sessions. Welcome message should have been shown by startNewChat.');
-             // startNewChat called by loadChatSessions likely already handled UI
+            // Nếu không có session nào (loadChatSessions đã gọi startNewChat)
+            console.log('[main.js] No initial session ID found. startNewChat should have handled UI.');
+            // startNewChat đã gọi loadSessionUI(newSession, showWelcomeMessageHandler);
+            // loadSessionUI sẽ tự gọi showWelcomeMessageHandler vì newSession chưa có messages.
         }
     } else {
         console.error('[main.js] Failed to load initial chat sessions. Check logs from session.js.');
@@ -87,8 +93,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (historyElement && !historyElement.querySelector('.text-red-500')) {
              historyElement.innerHTML = '<p class="text-center text-red-500 text-sm p-4">Lỗi tải lịch sử.</p>';
         }
-        // Optionally show an error/welcome message in the chat area too
-        // showWelcomeMessage(); // Or a specific error message display
+        // Optionally show an error message in the chat area if needed
+        const chatContainer = document.getElementById('chatContainer');
+        if (chatContainer) {
+            chatContainer.innerHTML = '<p class="text-center text-red-500 text-sm p-4">Không thể tải dữ liệu. Vui lòng thử lại.</p>';
+        }
     }
 
     // 6. Attach Event Listeners (Now that initial state is potentially set)

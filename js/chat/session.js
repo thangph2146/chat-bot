@@ -187,24 +187,25 @@ export async function loadChatSessions() {
 
 /**
  * Tải tin nhắn chi tiết cho một session cụ thể từ API.
- * Sử dụng fetchWithAuth.
+ * Sử dụng fetchWithAuth và endpoint: /api/ChatSessions/{sessionId}.
  */
-async function loadSessionMessages(sessionId) {
-    console.log(`[session.js] Attempting to load messages for session: ${sessionId}`);
+export async function loadSessionMessages(sessionId) {
+    console.log(`[session.js] Attempting to load session details AND messages for session: ${sessionId} using SESSIONS_API_ENDPOINT.`);
     const targetSession = chatSessions.find(s => s.id === sessionId);
     if (!targetSession) {
         console.error(`[session.js] Session ${sessionId} not found locally.`);
         showNotification('Không tìm thấy phiên chat cục bộ.', 'error');
-        return; // Dừng lại nếu không tìm thấy session
+        return;
     }
 
     currentSessionId = sessionId;
     console.log(`[session.js] Set currentSessionId = ${currentSessionId}`);
     updateHistorySidebar(chatSessions, currentSessionId, handleSelectSession, handleDeleteRequest);
 
-    targetSession.messages = [];
-    const messagesApiUrl = `${SESSIONS_API_ENDPOINT}/${sessionId}`;
-    console.log(`[session.js] Fetching messages from ${messagesApiUrl}...`);
+    // Xóa tin nhắn cũ trước khi tải
+    targetSession.messages = []; 
+    const sessionDetailApiUrl = `${SESSIONS_API_ENDPOINT}/${sessionId}`; // <<< Sử dụng lại endpoint session details
+    console.log(`[session.js] Fetching session details & messages from ${sessionDetailApiUrl}...`);
 
     const chatContainer = document.getElementById('chatContainer');
     if (chatContainer) {
@@ -212,38 +213,42 @@ async function loadSessionMessages(sessionId) {
     }
 
     try {
-        // Sử dụng fetchWithAuth
-        const sessionData = await fetchWithAuth(messagesApiUrl);
+        // Gọi API lấy chi tiết session (bao gồm messages)
+        const sessionData = await fetchWithAuth(sessionDetailApiUrl); // <<< API trả về object sessionData trực tiếp
 
-        console.log(`[session.js] Raw messages data for ${sessionId}:`, sessionData);
+        console.log(`[session.js] Raw sessionData object for ${sessionId}:`, sessionData); 
 
         // Kiểm tra sessionData và sessionData.messages
-        if (!sessionData || !Array.isArray(sessionData.messages)) {
-             console.error(`[session.js] Invalid messages data format for session ${sessionId}:`, sessionData);
-             throw new Error('Định dạng dữ liệu tin nhắn từ API không hợp lệ');
+        if (!sessionData || !Array.isArray(sessionData.messages)) { // <<< Kiểm tra object và thuộc tính messages
+             console.error(`[session.js] Invalid session data object or missing messages array for session ${sessionId}:`, sessionData);
+             throw new Error('Định dạng dữ liệu session hoặc tin nhắn không hợp lệ');
         }
 
         try {
-            targetSession.messages = sessionData.messages.map(apiMsg => {
+            targetSession.messages = sessionData.messages.map(apiMsg => { // <<< Map từ sessionData.messages
                  if (!apiMsg || typeof apiMsg.content === 'undefined') return null;
                  return {
-                     id: apiMsg.id,
-                     senderName: apiMsg.senderName || (apiMsg.isUser ? 'Người dùng' : 'Bot'),
+                     id: apiMsg.id, 
+                     senderName: apiMsg.senderName || (apiMsg.isUser ? 'Người dùng' : 'Bot'), 
                      isUser: Boolean(apiMsg.isUser),
                      content: apiMsg.content,
-                     timestamp: apiMsg.timestamp || new Date().toISOString()
+                     timestamp: apiMsg.timestamp || new Date().toISOString() 
                  };
              }).filter(msg => msg !== null)
-               .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+               .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()); 
             console.log(`[session.js] Processed ${targetSession.messages.length} messages for ${sessionId}.`);
         } catch (mapSortError) {
              console.error(`[session.js] Error processing messages for ${sessionId}:`, mapSortError);
              throw new Error('Lỗi xử lý dữ liệu tin nhắn.');
         }
 
-        targetSession.title = sessionData.title || targetSession.title;
-        targetSession.lastUpdatedAt = sessionData.lastUpdatedAt || targetSession.lastUpdatedAt || new Date().toISOString();
-        targetSession.conversationId = sessionData.conversationId || targetSession.conversationId || null;
+        // Cập nhật thông tin session từ dữ liệu API trả về
+        targetSession.title = sessionData.title || targetSession.title; // Cập nhật title nếu có
+        targetSession.conversationId = sessionData.conversationId || targetSession.conversationId || null; // Cập nhật conversationId nếu có
+        targetSession.lastUpdatedAt = sessionData.lastUpdatedAt || targetSession.lastUpdatedAt || new Date().toISOString(); // Cập nhật lastUpdatedAt
+
+        // Sắp xếp lại list session theo lastUpdatedAt mới nhất
+        chatSessions.sort((a, b) => new Date(b.lastUpdatedAt).getTime() - new Date(a.lastUpdatedAt).getTime());
 
         updateHistorySidebar(chatSessions, currentSessionId, handleSelectSession, handleDeleteRequest);
         console.log(`[session.js] Calling loadSessionUI for ${sessionId}.`);
@@ -257,7 +262,7 @@ async function loadSessionMessages(sessionId) {
                 chatContainer.innerHTML = '<p class="text-center text-red-500 p-4">Lỗi tải tin nhắn.</p>';
             }
          }
-        if (targetSession) targetSession.messages = [];
+        if (targetSession) targetSession.messages = []; // Đảm bảo messages rỗng nếu lỗi
     }
 }
 
@@ -375,7 +380,6 @@ async function deleteSession(sessionId) {
            showNotification(error.message || 'Lỗi khi xóa phiên chat.', 'error');
         }
         // Không throw lại lỗi để không làm crash luồng dialog
-        // throw error; // Bỏ throw ở đây nếu không muốn dialog bị kẹt ở trạng thái loading
     }
 }
 
@@ -411,14 +415,15 @@ export function handleClearHistoryRequest() {
  * @param {string} sessionId - ID của session được chọn.
  */
 export async function handleSelectSession(sessionId) {
-     console.log(`[session.js] handleSelectSession called for: ${sessionId}`);
+     console.log(`%c[session.js] handleSelectSession TRIGGERED for session: ${sessionId}`, 'color: blue; font-weight: bold;');
      if (isLoading) {
          console.log(`[session.js] Selection change skipped, loading in progress.`);
          return;
      }
+     console.log(`[session.js] Checking conditions: isLoading=${isLoading}, sessionId=${sessionId}, currentSessionId=${currentSessionId}, shouldLoad=${sessionId !== currentSessionId}`);
      if (sessionId !== currentSessionId) {
-        console.log(`[session.js] Session change requested from ${currentSessionId} to ${sessionId}. Loading messages...`);
-        await loadSessionMessages(sessionId); // Đã có sẵn loadSessionMessages
+        console.log(`[session.js] Session changed! Calling loadSessionMessages...`);
+        await loadSessionMessages(sessionId);
         console.log(`[session.js] Finished processing selection change for ${sessionId}.`);
      } else {
         console.log(`[session.js] Clicked on the currently active session (${sessionId}). No messages reloaded.`);

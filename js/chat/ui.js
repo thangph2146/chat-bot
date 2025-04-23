@@ -74,7 +74,7 @@ export function showLoading(show) {
  * @returns {HTMLElement | null} Phần tử chứa nội dung tin nhắn (để cập nhật khi streaming) hoặc null.
  */
 export function addMessageToChat(message, isUser = false, save = true, customId = null, timestamp = null, isStreaming = false) {
-    console.log(`[ui.js] Adding message to chat. User: ${isUser}, Streaming: ${isStreaming}, Message:`, message ? message.substring(0, 50) + '...' : '(No message/Placeholder)');
+    console.log(`%c[ui.js] addMessageToChat CALLED. User: ${isUser}, Streaming: ${isStreaming}, ID: ${customId || '(auto)'}`, 'color: orange;');
     if (!chatContainer) {
         console.error('[ui.js] chatContainer element not found!');
         return null;
@@ -131,6 +131,7 @@ export function addMessageToChat(message, isUser = false, save = true, customId 
     }
 
     chatContainer.appendChild(messageDiv);
+    console.log(`[ui.js]   -> Appended message element to chatContainer. Child count: ${chatContainer.childElementCount}`);
     setTimeout(() => {
          try {
              if (chatContainer.scrollHeight > chatContainer.clientHeight) {
@@ -254,7 +255,7 @@ export function updateHistorySidebar(sessions, currentId, onSelect, onDelete) {
  * @param {Function} showWelcomeFn - Hàm để hiển thị welcome message nếu session trống.
  */
 export function loadSessionUI(session, showWelcomeFn) {
-    console.log(`[ui.js] Loading UI for session:`, session ? session.id : 'null/undefined session');
+    console.log(`%c[ui.js] loadSessionUI CALLED for session: ${session ? session.id : 'null/invalid'}`, 'color: green; font-weight: bold;');
     if (!chatContainer) {
          console.error('[ui.js] chatContainer not found in loadSessionUI!');
          return;
@@ -262,15 +263,16 @@ export function loadSessionUI(session, showWelcomeFn) {
     chatContainer.innerHTML = '';
 
     if (session?.messages?.length > 0) {
-        console.log(`[ui.js] Session ${session.id} has ${session.messages.length} messages. Rendering...`);
+        console.log(`[ui.js] Session ${session.id} has ${session.messages.length} messages. Rendering loop starting...`);
         hideStaticWelcomeMessage();
         try {
-            session.messages.forEach(msg => {
+            session.messages.forEach((msg, index) => {
                 // Add check for message content
                 if (msg && typeof msg.content !== 'undefined') { // Check if content exists
+                    console.log(`[ui.js]   Loop ${index}: Calling addMessageToChat for msg ID ${msg.id || '(no ID)'}, user=${msg.isUser}`);
                     addMessageToChat(msg.content, msg.isUser, false, msg.id, msg.timestamp);
                 } else {
-                    console.warn(`[ui.js] Skipping message with missing content in session ${session.id}:`, msg);
+                    console.warn(`[ui.js]   Loop ${index}: Skipping message with missing content in session ${session.id}:`, msg);
                 }
             });
         } catch(renderError) {
