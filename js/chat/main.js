@@ -7,7 +7,6 @@ import {
 import {
     loadChatSessions,
     startNewChat,
-    handleClearHistoryRequest,
     setShowWelcomeMessageHandler,
     getAllSessions,
     getCurrentSessionId,
@@ -38,7 +37,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         sendButton: document.getElementById('sendButton'),
         newChatButton: document.getElementById('newChatButton'),
         newChatButtonSidebar: document.getElementById('newChatButtonSidebar'),
-        clearHistoryButton: document.getElementById('clearHistoryButton'),
         recordButton: document.getElementById('recordButton'),
         logoutButton: document.getElementById('logoutButton'),
         historySessions: document.getElementById('historySessions'),
@@ -77,8 +75,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // 4. Load Initial Session Data (Fetch & Process Only)
     console.log('[main.js] ---> Calling loadChatSessions...');
-    // Pass historySessions element for potential error display inside loadChatSessions
-    const loadSuccess = await loadChatSessions(domElements.historySessions);
+    // Pass the entire domElements object now
+    const loadSuccess = await loadChatSessions(domElements); // Pass the whole object
     console.log(`[main.js] <--- loadChatSessions completed. Success: ${loadSuccess}`);
 
     // 5. Update UI Based on Load Result
@@ -180,14 +178,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         domElements.newChatButtonSidebar.addEventListener('click', () => startNewChat(domElements));
     } else {
         console.warn('New Chat button (sidebar) not found');
-    }
-
-    // Clear history listener
-    if (domElements.clearHistoryButton) {
-        // Pass necessary elements if handleClearHistoryRequest needs them (e.g., for dialogs from ui.js)
-        domElements.clearHistoryButton.addEventListener('click', () => handleClearHistoryRequest(domElements));
-    } else {
-        console.warn('Clear History button not found');
     }
 
     // Recording listener

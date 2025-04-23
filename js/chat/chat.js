@@ -74,7 +74,7 @@ export async function handleSendMessage(domElements) {
         timestamp: new Date().toISOString()
     };
     addMessageToChat(messageToSend, chatContainer, true, false, null, userMessageData.timestamp); // Pass chatContainer
-    addMessageToCurrentSession(userMessageData); // Add to session state
+    addMessageToCurrentSession(userMessageData, domElements); // Add domElements argument
 
     messageInput.value = '';
     messageInput.style.height = 'auto';
@@ -82,7 +82,7 @@ export async function handleSendMessage(domElements) {
     // --- Update title if first message (client-side) ---
     if (currentSession.title && currentSession.title.startsWith('Cuộc trò chuyện mới') && messageToSend.length > 0) {
         const newTitle = messageToSend.length > 30 ? messageToSend.substring(0, 27) + '...' : messageToSend;
-        updateCurrentSessionTitle(newTitle);
+        updateCurrentSessionTitle(newTitle, domElements); // Add domElements argument
     }
 
     // --- Bước 2: Gọi AI (Dify) để lấy câu trả lời (sử dụng domElements) ---
@@ -131,7 +131,7 @@ export async function handleSendMessage(domElements) {
                     isUser: false,
                     timestamp: new Date().toISOString()
                 };
-                addMessageToCurrentSession(aiMessageData);
+                addMessageToCurrentSession(aiMessageData, domElements); // Add domElements argument
 
                 if (result.conversationId && result.conversationId !== latestConversationId) {
                      latestConversationId = result.conversationId;
@@ -264,7 +264,7 @@ export async function showWelcomeMessage(chatContainerElement, welcomeElement, c
                     isUser: false,
                     timestamp: new Date().toISOString()
                 };
-                addMessageToCurrentSession(aiMessageData);
+                addMessageToCurrentSession(aiMessageData, domElements); // Add domElements argument
 
                 // Update conversationId for the current session based on the welcome message response
                  if (result.conversationId) {
