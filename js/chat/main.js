@@ -13,18 +13,13 @@ import {
     handleDeleteRequest,
     loadSessionMessages
 } from './session.js';
-import {
-    handleSendMessage,
-    showWelcomeMessage
-} from './chat.js';
+import { showWelcomeMessage } from './chat.js';
 import {
     initSpeechRecognition,
     toggleRecording
 } from './speech.js';
 import {
     updateHistorySidebar,
-    showWelcomeScreen,
-    hideWelcomeScreen
 } from './ui.js';
 
 // Main application entry point
@@ -139,11 +134,31 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // 6. Add Event Listeners (using domElements)
     if (domElements.sendButton && domElements.messageInput) {
-        domElements.sendButton.addEventListener('click', () => handleSendMessage(domElements));
-        domElements.messageInput.addEventListener('keypress', (e) => {
+        domElements.sendButton.addEventListener('click', async () => {
+            try {
+                const chatModule = await import('./chat.js');
+                if (chatModule && typeof chatModule.handleSendMessage === 'function') {
+                     await chatModule.handleSendMessage(domElements);
+                } else {
+                     console.error("[main.js] handleSendMessage function not found in dynamically imported module (sendButton).");
+                }
+            } catch (error) {
+                 console.error("[main.js] Error dynamically importing or calling handleSendMessage (sendButton):", error);
+            }
+        });
+        domElements.messageInput.addEventListener('keypress', async (e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault(); // Prevent default newline on Enter
-                handleSendMessage(domElements);
+                 try {
+                    const chatModule = await import('./chat.js');
+                    if (chatModule && typeof chatModule.handleSendMessage === 'function') {
+                         await chatModule.handleSendMessage(domElements);
+                    } else {
+                         console.error("[main.js] handleSendMessage function not found in dynamically imported module (keypress).");
+                    }
+                } catch (error) {
+                     console.error("[main.js] Error dynamically importing or calling handleSendMessage (keypress):", error);
+                }
             }
         });
     } else {
@@ -156,7 +171,16 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (result.success && result.needsInitialMessage) {
                 if(domElements.messageInput) {
                     domElements.messageInput.value = "Bắt đầu cuộc trò chuyện mới";
-                    handleSendMessage(domElements);
+                     try {
+                        const chatModule = await import('./chat.js');
+                        if (chatModule && typeof chatModule.handleSendMessage === 'function') {
+                            await chatModule.handleSendMessage(domElements);
+                        } else {
+                             console.error("[main.js] handleSendMessage function not found in dynamically imported module (newChatButton).");
+                        }
+                    } catch (error) {
+                         console.error("[main.js] Error dynamically importing or calling handleSendMessage (newChatButton):", error);
+                    }
                 } else {
                     console.warn("[main.js] Cannot send initial message: messageInput not found.");
                 }
@@ -171,7 +195,16 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (result.success && result.needsInitialMessage) {
                 if(domElements.messageInput) {
                     domElements.messageInput.value = "Bắt đầu cuộc trò chuyện mới";
-                    handleSendMessage(domElements);
+                    try {
+                        const chatModule = await import('./chat.js');
+                        if (chatModule && typeof chatModule.handleSendMessage === 'function') {
+                             await chatModule.handleSendMessage(domElements);
+                        } else {
+                             console.error("[main.js] handleSendMessage function not found in dynamically imported module (newChatSidebar).");
+                        }
+                    } catch (error) {
+                         console.error("[main.js] Error dynamically importing or calling handleSendMessage (newChatSidebar):", error);
+                    }
                 } else {
                     console.warn("[main.js] Cannot send initial message: messageInput not found.");
                 }

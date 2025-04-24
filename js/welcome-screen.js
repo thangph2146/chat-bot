@@ -1,6 +1,5 @@
 // File xử lý màn hình chào mừng
 
-import { handleSendMessage } from './chat/chat.js'; // Import handleSendMessage
 import { getCurrentSessionId } from './chat/session.js'; // Import getCurrentSessionId
 
 // Store references to elements once the DOM is loaded
@@ -40,7 +39,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Add event listener for the start chat button
-    startChatButton.addEventListener('click', function() {
+    startChatButton.addEventListener('click', async function() {
 
         // Hide welcome message using the reference
         if (welcomeDivRef) {
@@ -77,8 +76,19 @@ document.addEventListener('DOMContentLoaded', function() {
             // Set the message content
             messageInputRef.value = "Bắt đầu cuộc trò chuyện";
 
-            // Call handleSendMessage
-            handleSendMessage(domElementsForSend);
+            try {
+                // Use dynamic import here
+                const chatModule = await import('./chat/chat.js'); 
+                if (chatModule && typeof chatModule.handleSendMessage === 'function') {
+                    // Call handleSendMessage from the dynamically imported module
+                    await chatModule.handleSendMessage(domElementsForSend);
+                } else {
+                    console.error("[welcome-screen.js] handleSendMessage function not found in dynamically imported module.");
+                }
+            } catch (error) {
+                console.error("[welcome-screen.js] Error dynamically importing or calling handleSendMessage:", error);
+            }
+            
 
             // Clear the input field immediately after calling send
             messageInputRef.value = ''; 
