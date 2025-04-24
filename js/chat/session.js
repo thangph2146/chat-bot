@@ -156,9 +156,11 @@ export function updateCurrentSessionConversationId(convId) {
  */
 export async function loadChatSessions(domElements) {
     if (isLoading) {
+        console.warn("[session.js] loadChatSessions called while already loading.");
         return false;
     }
     isLoading = true;
+    console.log("[session.js] loadChatSessions started.");
 
     // Extract elements from domElements object
     const historySessionsElement = domElements?.historySessions;
@@ -169,7 +171,6 @@ export async function loadChatSessions(domElements) {
     // Check if essential elements exist
     if (!historySessionsElement) {
         console.error('[session.js] loadChatSessions: Missing historySessions element in domElements.');
-        // Optionally show error or handle differently
         isLoading = false;
         return false;
     }
@@ -177,13 +178,10 @@ export async function loadChatSessions(domElements) {
     const userInfo = getUserInfo();
     const userId = userInfo?.data?.userId;
 
-    // const resolvedHistoryElement = historySessionsElement || document.getElementById('historySessions'); // No longer needed
-
     if (userId === undefined || userId === null) {
         console.error("[session.js] User ID missing. Cannot fetch sessions.");
         showNotification('Lỗi xác thực, không thể tải lịch sử chat.', 'error');
         historySessionsElement.innerHTML = '<p class="text-center text-red-500 text-sm p-4">Lỗi xác thực.</p>';
-        // Pass the extracted elements to updateHistorySidebar
         updateHistorySidebar([], null, handleSelectSession, handleDeleteRequest, historySessionsElement, chatContainerElement, welcomeElement, chatMessagesElement);
         isLoading = false;
         return false;
@@ -193,22 +191,39 @@ export async function loadChatSessions(domElements) {
     historySessionsElement.innerHTML = '<p class="text-center text-secondary-500 text-sm p-4">Đang tải lịch sử...</p>';
 
     try {
-        // Sử dụng fetchWithAuth (mặc định là GET và mong đợi JSON)
+        console.log(`[session.js] Fetching sessions from: ${userSessionsApiUrl}`);
         const data = await fetchWithAuth(userSessionsApiUrl);
-
+        console.log(`[session.js] Response from ${userSessionsApiUrl}:`, JSON.stringify(data)); // Log full response
 
         if (data === null || (Array.isArray(data) && data.length === 0)) {
-            // Xử lý trường hợp 404 hoặc mảng rỗng
+            console.log('[session.js] Empty session list detected. Attempting to start a new chat...');
             chatSessions = [];
             currentSessionId = null;
-            historySessionsElement.innerHTML = `<p class="text-center text-secondary-500 text-sm p-4">Chưa có lịch sử trò chuyện.</p>`;
-            // Pass the original domElements object to startNewChat
-            await startNewChat(domElements); // <<< Pass the whole object
-            isLoading = false;
-            return true; // Thành công (danh sách rỗng)
+            historySessionsElement.innerHTML = `<p class="text-center text-secondary-500 text-sm p-4">Chưa có lịch sử. Đang tạo cuộc trò chuyện mới...</p>`;
+            showNotification('Đang bắt đầu cuộc trò chuyện mới...', 'info', 2000);
+            
+            // *** FIX: Reset isLoading before calling startNewChat ***
+            isLoading = false; 
+            console.log("[session.js] Reset isLoading before calling startNewChat.");
+            
+            const newChatSuccess = await startNewChat(domElements); 
+            // isLoading will be set again inside startNewChat if it proceeds
+            
+            if (newChatSuccess) {
+                console.log("[session.js] New chat started successfully within loadChatSessions.");
+                // No need to set isLoading = false here, startNewChat handles it
+                return true; 
+            } else {
+                console.error("[session.js] Failed to start new chat within loadChatSessions.");
+                historySessionsElement.innerHTML = '<p class="text-center text-red-500 text-sm p-4">Lỗi tạo cuộc trò chuyện mới.</p>';
+                // Ensure isLoading is false if startNewChat failed internally without resetting
+                isLoading = false; 
+                return false; 
+            }
         }
 
         if (Array.isArray(data)) {
+            console.log(`[session.js] Processing ${data.length} sessions from API.`);
             try {
                 chatSessions = data.map((item, index) => {
                     if (!item || typeof item.id === 'undefined' || item.id === null) {
@@ -230,49 +245,57 @@ export async function loadChatSessions(domElements) {
                         oldestMessageId: null
                     };
                 }).sort((a, b) => new Date(b.lastUpdatedAt).getTime() - new Date(a.lastUpdatedAt).getTime());
+                 console.log("[session.js] Sessions mapped and sorted.");
 
-                // Select the most recent session initially
                 if (chatSessions.length > 0) {
                     currentSessionId = chatSessions[0].id;
-                    // Load messages for the initially selected session
-                    // Make sure all required elements are available in domElements
+                    console.log(`[session.js] Set currentSessionId to the most recent: ${currentSessionId}`);
                     if (chatContainerElement && welcomeElement && chatMessagesElement) {
-                       await loadSessionMessages(currentSessionId, historySessionsElement, chatContainerElement, welcomeElement, chatMessagesElement);
+                        // loadSessionMessages will be called by main.js after this returns true
+                        // await loadSessionMessages(currentSessionId, historySessionsElement, chatContainerElement, welcomeElement, chatMessagesElement);
                     } else {
                        console.error('[session.js] Cannot load initial session messages: Missing DOM elements.');
                     }
                 } else {
-                    // If somehow sessions array is empty after processing non-empty data
-                    await startNewChat(domElements);
+                     console.warn('[session.js] Session array is empty after processing non-empty API data? Starting new chat.');
+                    // This case should ideally not happen if API returned data, but handle it defensively
+                    isLoading = false; // Reset before calling startNewChat
+                    console.log("[session.js] Reset isLoading before calling startNewChat (edge case).");
+                    const newChatSuccess = await startNewChat(domElements);
+                    // No need to set isLoading=false here, startNewChat handles it
+                    return newChatSuccess; 
                 }
 
             } catch (mapSortError) {
                 console.error('[session.js] Error processing session data:', mapSortError);
-                throw new Error('Lỗi xử lý dữ liệu session.');
+                isLoading = false;
+                throw new Error('Lỗi xử lý dữ liệu session.'); // Re-throw to be caught below
             }
-            // Update sidebar after processing and potentially loading the first session
-            updateHistorySidebar(chatSessions, currentSessionId, handleSelectSession, handleDeleteRequest, historySessionsElement, chatContainerElement, welcomeElement, chatMessagesElement);
+            
+            // Update sidebar after processing (main.js will call loadSessionMessages)
+            // We don't call updateHistorySidebar here anymore, main.js does it after load completes.
+            // updateHistorySidebar(chatSessions, currentSessionId, handleSelectSession, handleDeleteRequest, historySessionsElement, chatContainerElement, welcomeElement, chatMessagesElement);
+            console.log("[session.js] loadChatSessions finished successfully (found existing sessions).");
             isLoading = false;
-            return true; // Thành công
+            return true; // Success
         } else {
-            console.error('[session.js] Invalid API response structure. Expected array or null, received:', data);
+            console.error('[session.js] Invalid API response structure. Expected array or null, received:', typeof data, data);
+            isLoading = false;
             throw new Error('Dữ liệu lịch sử API người dùng không hợp lệ.');
         }
 
     } catch (error) {
-        // fetchWithAuth đã xử lý lỗi 401 và log các lỗi HTTP khác
         console.error('[session.js] Error in loadChatSessions catch block:', error);
         chatSessions = [];
         currentSessionId = null;
-        // Chỉ hiển thị thông báo nếu lỗi không phải là 401 (đã xử lý trong fetchWithAuth)
         if (!error.message.includes('401')) {
             showNotification(error.message || 'Không thể tải lịch sử chat.', 'error');
             historySessionsElement.innerHTML = '<p class="text-center text-red-500 text-sm p-4">Lỗi tải lịch sử.</p>';
         }
-         // Also update sidebar in error case to ensure it's cleared
          updateHistorySidebar([], null, handleSelectSession, handleDeleteRequest, historySessionsElement, chatContainerElement, welcomeElement, chatMessagesElement);
+         console.log("[session.js] loadChatSessions finished with error.");
         isLoading = false;
-        return false;
+        return false; // Indicate failure
     }
 }
 
@@ -286,6 +309,7 @@ export async function loadChatSessions(domElements) {
  * @param {HTMLElement} chatMessagesElement - Tham chiếu đến div bao ngoài khu vực chat (parent of container).
  */
 export async function loadSessionMessages(sessionId, historySessionsElement, chatContainerElement, welcomeElement, chatMessagesElement) {
+    console.log(`[session.js] loadSessionMessages called for sessionId: ${sessionId}`);
     const targetSession = chatSessions.find(s => s.id === sessionId);
     if (!targetSession) {
         console.error(`[session.js] Session ${sessionId} not found locally for initial load.`);
@@ -301,42 +325,48 @@ export async function loadSessionMessages(sessionId, historySessionsElement, cha
 
     // Remove previous scroll listener if exists
     if (currentScrollListener && chatContainerElement) {
+        console.log("[session.js] Removing previous scroll listener.");
         chatContainerElement.removeEventListener('scroll', currentScrollListener);
     }
     currentScrollListener = null; // Reset the stored listener
 
     currentSessionId = sessionId;
-    // Update sidebar highlight
+    console.log(`[session.js] currentSessionId set to: ${currentSessionId}`);
+    // Update sidebar highlight (ensure all elements are passed)
     updateHistorySidebar(chatSessions, currentSessionId, handleSelectSession, handleDeleteRequest, historySessionsElement, chatContainerElement, welcomeElement, chatMessagesElement);
 
 
     // Use the specific ChatMessages endpoint for recent messages
-    // Endpoint from user query: http://172.20.10.44:8055/api/ChatMessages/session/{sessionId}/recent?count=5
-    // Let's use a slightly larger initial count, e.g., 20
     const initialMessagesCount = 5;
-    // Workaround: Force the correct base path, ignoring potential extra parts in CHAT_API_ENDPOINT
     const messagesApiUrl = `${CHAT_MESSAGE_API_ENDPOINT}/session/${sessionId}/recent?count=${initialMessagesCount}`;
+    console.log(`[session.js] Fetching initial messages from: ${messagesApiUrl}`);
 
     if (chatContainerElement) {
          chatContainerElement.innerHTML = '<p class="text-center text-secondary-500 p-4">Đang tải tin nhắn...</p>'; // Show loading message
     }
+    // Ensure welcome screen is hidden
+    if (welcomeElement) {
+        welcomeElement.style.display = 'none';
+    }
+    // Ensure chat message area is visible
+    if (chatMessagesElement) {
+        chatMessagesElement.classList.remove('hidden');
+    }
 
     try {
-        // Fetch initial recent messages
-        const initialMessages = await fetchWithAuth(messagesApiUrl); // API expected to return array of messages
+        const initialMessages = await fetchWithAuth(messagesApiUrl);
+        console.log(`[session.js] Initial messages API response for ${sessionId}:`, JSON.stringify(initialMessages));
 
-
-        // Check if the response is a valid array
         if (!Array.isArray(initialMessages)) {
              console.error(`[session.js] Invalid messages data received for session ${sessionId}:`, initialMessages);
              throw new Error('Định dạng dữ liệu tin nhắn không hợp lệ');
         }
 
         try {
-            const mappedMessages = initialMessages.map(apiMsg => {
+             const mappedMessages = initialMessages.map(apiMsg => {
                  if (!apiMsg || typeof apiMsg.content === 'undefined') return null;
                  return {
-                     id: apiMsg.id, // Ensure messages have unique IDs from the API
+                     id: apiMsg.id,
                      senderName: apiMsg.senderName || (apiMsg.isUser ? 'Người dùng' : 'Bot'),
                      isUser: Boolean(apiMsg.isUser),
                      content: apiMsg.content,
@@ -344,22 +374,24 @@ export async function loadSessionMessages(sessionId, historySessionsElement, cha
                  };
              }).filter(msg => msg !== null)
                .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+             console.log(`[session.js] Mapped and sorted ${mappedMessages.length} initial messages.`);
 
-            targetSession.messages = mappedMessages; // Assign the initially loaded messages
+            targetSession.messages = mappedMessages;
 
             if (mappedMessages.length > 0) {
-                targetSession.oldestMessageId = mappedMessages[0].id; // Store the ID of the oldest message (first in sorted array)
+                targetSession.oldestMessageId = mappedMessages[0].id;
+                console.log(`[session.js] Oldest message ID set to: ${targetSession.oldestMessageId}`);
             } else {
-                // No messages loaded initially
-                targetSession.hasMoreOlder = false; // No older messages if none initially
+                targetSession.hasMoreOlder = false;
+                console.log("[session.js] No initial messages loaded, setting hasMoreOlder to false.");
             }
 
-             // If fewer messages were returned than requested, assume no more older messages
             if (mappedMessages.length < initialMessagesCount) {
                 targetSession.hasMoreOlder = false;
+                console.log("[session.js] Fewer messages loaded than requested, setting hasMoreOlder to false.");
             }
 
-            // --- START: Kiểm tra và cập nhật title dựa trên tin nhắn người dùng mới nhất ---
+            // --- START: Update title based on last user message --- 
             let lastUserMessage = null;
             for (let i = mappedMessages.length - 1; i >= 0; i--) {
                 if (mappedMessages[i].isUser) {
@@ -375,21 +407,18 @@ export async function loadSessionMessages(sessionId, historySessionsElement, cha
                                               ? userContent.substring(0, 27) + '...'
                                               : userContent;
                     if (potentialNewTitle !== targetSession.title) {
-                        // Tạo object domElements tạm thời nếu cần
                          const tempDomElements = {
                              historySessions: historySessionsElement,
                              chatContainer: chatContainerElement,
                              welcomeMessageDiv: welcomeElement,
                              chatMessagesDiv: chatMessagesElement
                          };
-                        // Gọi hàm cập nhật (sẽ cập nhật client state, UI, và gửi API)
-                        // Dùng await để đảm bảo title được cập nhật trước khi load UI? Có thể không cần thiết vì updateCurrentSessionTitle cập nhật UI ngay.
-                        // Tạm thời không await để tránh block
-                        updateCurrentSessionTitle(potentialNewTitle, tempDomElements); 
+                        console.log(`[session.js] Updating session title to: "${potentialNewTitle}" based on last user message.`);
+                        updateCurrentSessionTitle(potentialNewTitle, tempDomElements);
                     }
                 }
             }
-            // --- END: Kiểm tra và cập nhật title ---
+            // --- END: Update title --- 
 
         } catch (mapSortError) {
              console.error(`[session.js] Error processing initial messages for ${sessionId}:`, mapSortError);
@@ -397,32 +426,30 @@ export async function loadSessionMessages(sessionId, historySessionsElement, cha
         }
 
         // Load the UI with the initial messages
-        // Construct the domElements object needed by loadSessionUI
         const elementsForUI = {
             historySessions: historySessionsElement,
             chatContainer: chatContainerElement,
             welcomeMessageDiv: welcomeElement,
             chatMessagesDiv: chatMessagesElement
-            // Add other elements from domElements if loadSessionUI or its callees need them
         };
-        loadSessionUI(targetSession, showWelcomeMessageHandler, elementsForUI);
+        console.log("[session.js] Calling loadSessionUI...");
+        loadSessionUI(targetSession, null, elementsForUI); // Pass null for showWelcomeMessageHandler here
 
-        // Add scroll listener AFTER UI is loaded and elements exist
+        // Add scroll listener AFTER UI is loaded
         if (targetSession.hasMoreOlder && chatContainerElement) {
-            // Define the listener function
+            console.log("[session.js] Adding scroll listener for loading older messages.");
             const scrollListener = async (event) => {
-                // Check if scrolled near the top (e.g., within 50px)
                 if (event.target.scrollTop <= 50) {
-                    // Pass necessary elements to loadOlderMessages
+                    console.log("[session.js] Scrolled near top, attempting to load older messages...");
                     await loadOlderMessages(sessionId, chatContainerElement);
                 }
             };
-            // Attach the listener
             chatContainerElement.addEventListener('scroll', scrollListener);
-            // Store the listener function so it can be removed later
             currentScrollListener = scrollListener;
         } else {
+             console.log("[session.js] Not adding scroll listener (hasMoreOlder=false or chatContainerElement missing).");
         }
+         console.log("[session.js] loadSessionMessages completed successfully.");
 
     } catch (error) {
         console.error(`[session.js] Error in initial loadSessionMessages for ${sessionId}:`, error);
@@ -432,8 +459,8 @@ export async function loadSessionMessages(sessionId, historySessionsElement, cha
                 chatContainerElement.innerHTML = '<p class="text-center text-red-500 p-4">Lỗi tải tin nhắn ban đầu.</p>';
             }
          }
-        targetSession.messages = []; // Ensure messages are empty on error
-        targetSession.hasMoreOlder = false; // Can't load older if initial fails
+        targetSession.messages = [];
+        targetSession.hasMoreOlder = false;
     }
 }
 
@@ -450,20 +477,20 @@ async function loadOlderMessages(sessionId, chatContainerElement) {
         return;
     }
 
-    // Prevent simultaneous loads or loading when no more messages exist
     if (targetSession.isLoadingOlder || !targetSession.hasMoreOlder) {
+         console.log(`[session.js] Skipping loadOlderMessages: isLoadingOlder=${targetSession.isLoadingOlder}, hasMoreOlder=${targetSession.hasMoreOlder}`);
         return;
     }
 
      if (!targetSession.oldestMessageId) {
-        targetSession.hasMoreOlder = false; // Cannot proceed without a starting point
+        console.warn(`[session.js] Cannot load older messages: oldestMessageId is null for session ${sessionId}.`);
+        targetSession.hasMoreOlder = false;
         return;
     }
 
-
+    console.log(`[session.js] loadOlderMessages started for session ${sessionId}, before message ID ${targetSession.oldestMessageId}`);
     targetSession.isLoadingOlder = true;
 
-    // Optional: Show a loading indicator at the top
     const loadingIndicatorId = `loading-older-${sessionId}`;
     let loadingIndicator = chatContainerElement.querySelector(`#${loadingIndicatorId}`);
     if (!loadingIndicator) {
@@ -471,18 +498,22 @@ async function loadOlderMessages(sessionId, chatContainerElement) {
         loadingIndicator.id = loadingIndicatorId;
         loadingIndicator.className = 'text-center text-secondary-500 p-2 text-sm';
         loadingIndicator.textContent = 'Đang tải tin nhắn cũ hơn...';
-        chatContainerElement.prepend(loadingIndicator); // Add to the top
+        chatContainerElement.prepend(loadingIndicator);
+        console.log("[session.js] Prepended loading indicator.");
     }
 
-    // --- API Endpoint Assumption ---
-    // Assuming an endpoint like: /api/ChatMessages/session/{sessionId}/recent?count=10
-    // Workaround: Force the correct base path
     const olderMessagesCount = 10;
-    const olderMessagesApiUrl = `${CHAT_MESSAGE_API_ENDPOINT}/session/${sessionId}/recent?count=${olderMessagesCount}`;
-    // -----------------------------
+    // --- API Endpoint Assumption - NEEDS TO BE CORRECTED TO USE `beforeMessageId` --- 
+    // const olderMessagesApiUrl = `${CHAT_MESSAGE_API_ENDPOINT}/session/${sessionId}/before/${targetSession.oldestMessageId}?count=${olderMessagesCount}`;
+    // TEMPORARY WORKAROUND using /recent - THIS WILL NOT LOAD CORRECTLY
+     const olderMessagesApiUrl = `${CHAT_MESSAGE_API_ENDPOINT}/session/${sessionId}/recent?count=${olderMessagesCount}`;
+     console.warn(`[session.js] USING TEMPORARY /recent ENDPOINT FOR OLDER MESSAGES - THIS IS INCORRECT! API needs /before/{messageId}`);
+    // ----------------------------------------------------------------------------
 
     try {
-        const olderMessages = await fetchWithAuth(olderMessagesApiUrl); // Expected to return array
+        console.log(`[session.js] Fetching older messages from: ${olderMessagesApiUrl}`);
+        const olderMessages = await fetchWithAuth(olderMessagesApiUrl);
+        console.log(`[session.js] Older messages API response:`, JSON.stringify(olderMessages));
 
 
         if (!Array.isArray(olderMessages)) {
@@ -491,23 +522,18 @@ async function loadOlderMessages(sessionId, chatContainerElement) {
         }
 
         if (olderMessages.length === 0) {
-            // No more older messages found by API
+            console.log("[session.js] API returned 0 older messages. Setting hasMoreOlder to false.");
             targetSession.hasMoreOlder = false;
              if (currentScrollListener && chatContainerElement) {
                  chatContainerElement.removeEventListener('scroll', currentScrollListener);
-                 currentScrollListener = null; // Clear stored listener
+                 currentScrollListener = null;
+                 console.log("[session.js] Removed scroll listener (no more older messages).");
              }
         } else {
-            // --- Client-side Filtering START ---
-            // Get IDs of messages already loaded in the client
+            // Filter out messages already present (due to temporary API endpoint)
             const existingMessageIds = new Set(targetSession.messages.map(m => m.id));
-
             const newlyFetchedMessages = olderMessages.map(apiMsg => {
-                 if (!apiMsg || typeof apiMsg.content === 'undefined') return null;
-                 // Only map messages that are NOT already loaded
-                 if (existingMessageIds.has(apiMsg.id)) {
-                    return null;
-                 }
+                 if (!apiMsg || typeof apiMsg.content === 'undefined' || existingMessageIds.has(apiMsg.id)) return null;
                  return {
                      id: apiMsg.id,
                      senderName: apiMsg.senderName || (apiMsg.isUser ? 'Người dùng' : 'Bot'),
@@ -517,54 +543,63 @@ async function loadOlderMessages(sessionId, chatContainerElement) {
                  };
              }).filter(msg => msg !== null)
                .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
-            // --- Client-side Filtering END ---
+            console.log(`[session.js] Filtered down to ${newlyFetchedMessages.length} new older messages.`);
 
-            // Check if any *new* older messages were actually found after filtering
             if (newlyFetchedMessages.length === 0) {
+                 console.log("[session.js] No *new* older messages after filtering. Setting hasMoreOlder to false.");
                 targetSession.hasMoreOlder = false;
                  if (currentScrollListener && chatContainerElement) {
                      chatContainerElement.removeEventListener('scroll', currentScrollListener);
                      currentScrollListener = null;
+                     console.log("[session.js] Removed scroll listener (no new older messages after filter).");
                  }
             } else {
-                // Store the scroll height before adding new messages
                 const previousScrollHeight = chatContainerElement.scrollHeight;
                 const previousScrollTop = chatContainerElement.scrollTop;
 
-                // Prepend ONLY the newly fetched older messages to the session's array
                 targetSession.messages.unshift(...newlyFetchedMessages);
+                
+                // --- CORRECT LOGIC (when API supports `before`) ---
+                // targetSession.oldestMessageId = newlyFetchedMessages[0].id;
+                // console.log(`[session.js] Updated oldestMessageId to: ${targetSession.oldestMessageId}`);
+                // --- TEMPORARY (due to /recent endpoint) - Keep the *original* oldest ID ---
+                // This prevents infinite loops with the broken API call
+                console.warn("[session.js] NOT updating oldestMessageId due to temporary /recent endpoint.");
 
-                // Update the oldest message ID based on the *newly added* messages
-                // This ensures the next 'loadOlder' (if needed) starts from the right place *theoretically*
-                // although the current API won't use it.
-                targetSession.oldestMessageId = newlyFetchedMessages[0].id;
-
-                // Prepend ONLY the new message elements to the chat container
                 const fragment = document.createDocumentFragment();
                 newlyFetchedMessages.forEach(msg => {
-                    const messageElement = renderMessageElement(msg); // Use the refactored function
+                    const messageElement = renderMessageElement(msg);
                     fragment.appendChild(messageElement);
                 });
-                // Remove the loading indicator *before* prepending new content
                 if (loadingIndicator) {
                     loadingIndicator.remove();
-                    loadingIndicator = null; // Clear the reference
+                    loadingIndicator = null;
                 }
-                chatContainerElement.prepend(fragment); // Prepend the new messages
+                chatContainerElement.prepend(fragment);
+                console.log(`[session.js] Prepended ${newlyFetchedMessages.length} message elements.`);
 
-                // Maintain scroll position: scrollTop should increase by the height difference
                 const newScrollHeight = chatContainerElement.scrollHeight;
                 chatContainerElement.scrollTop = previousScrollTop + (newScrollHeight - previousScrollHeight);
+                console.log(`[session.js] Adjusted scroll position. PrevTop: ${previousScrollTop}, HeightDiff: ${newScrollHeight - previousScrollHeight}, NewTop: ${chatContainerElement.scrollTop}`);
 
-                // Check if the API returned fewer messages than requested OR if filtering removed messages
-                // This indicates the end of available history from the API's perspective
-                if (olderMessages.length < olderMessagesCount || newlyFetchedMessages.length < olderMessages.length) {
-                    targetSession.hasMoreOlder = false;
-                    if (currentScrollListener && chatContainerElement) {
-                        chatContainerElement.removeEventListener('scroll', currentScrollListener);
-                        currentScrollListener = null;
-                    }
+                // Due to using /recent, we can't reliably know if there are more. Assume no more to prevent loops.
+                console.warn("[session.js] Setting hasMoreOlder=false due to temporary /recent endpoint workaround.");
+                targetSession.hasMoreOlder = false; 
+                if (currentScrollListener && chatContainerElement) {
+                    chatContainerElement.removeEventListener('scroll', currentScrollListener);
+                    currentScrollListener = null;
+                    console.log("[session.js] Removed scroll listener (workaround).");
                 }
+                // --- Original logic (when API is correct) ---
+                // if (olderMessages.length < olderMessagesCount) {
+                //     targetSession.hasMoreOlder = false;
+                //     if (currentScrollListener && chatContainerElement) {
+                //         chatContainerElement.removeEventListener('scroll', currentScrollListener);
+                //         currentScrollListener = null;
+                //         console.log("[session.js] Removed scroll listener (API returned fewer than requested).");
+                //     }
+                // }
+                // --- End Original Logic ---
             }
         }
 
@@ -573,18 +608,18 @@ async function loadOlderMessages(sessionId, chatContainerElement) {
         if (!error.message.includes('401')) {
            showNotification('Lỗi khi tải tin nhắn cũ hơn.', 'error');
         }
-        targetSession.hasMoreOlder = false; // Stop trying if error occurs
-        // Optionally remove listener on error too
+        targetSession.hasMoreOlder = false;
          if (currentScrollListener && chatContainerElement) {
             chatContainerElement.removeEventListener('scroll', currentScrollListener);
             currentScrollListener = null;
+            console.log("[session.js] Removed scroll listener due to error.");
          }
     } finally {
-        // Remove loading indicator if it hasn't been removed yet (e.g., in case of empty response or error before prepend)
         if (loadingIndicator) {
             loadingIndicator.remove();
         }
-        targetSession.isLoadingOlder = false; // Reset loading flag
+        targetSession.isLoadingOlder = false;
+        console.log("[session.js] loadOlderMessages finished.");
     }
 }
 
@@ -593,29 +628,55 @@ async function loadOlderMessages(sessionId, chatContainerElement) {
  * Sử dụng fetchWithAuth.
  * @param {object} domElements - Đối tượng chứa các tham chiếu đến phần tử DOM quan trọng.
  *        (historySessions, chatContainer, welcomeMessageDiv, chatMessagesDiv)
+ * @returns {Promise<boolean>} True nếu tạo và xử lý thành công, False nếu có lỗi.
  */
 export async function startNewChat(domElements) {
+    console.log("[session.js] startNewChat initiated.");
     // Trích xuất các element cần thiết từ domElements
     const historySessionsElement = domElements?.historySessions;
     const chatContainerElement = domElements?.chatContainer;
-    const welcomeElement = domElements?.welcomeMessageDiv; // Đổi tên cho khớp với main.js
-    const chatMessagesElement = domElements?.chatMessagesDiv; // Đổi tên cho khớp với main.js
+    const welcomeElement = domElements?.welcomeMessageDiv;
+    const chatMessagesElement = domElements?.chatMessagesDiv;
 
-    // Kiểm tra các element trước khi sử dụng (optional but recommended)
-    if (!historySessionsElement || !chatContainerElement || !welcomeElement || !chatMessagesElement) {
-        console.error('[session.js] startNewChat: Missing required DOM elements from domElements object.', domElements);
-        showNotification("Lỗi giao diện người dùng.", "error");
-        return; // Không tiếp tục nếu thiếu element
+    console.log('[session.js] startNewChat: DOM elements check:', {
+        historySessions: !!historySessionsElement,
+        chatContainer: !!chatContainerElement,
+        welcomeMessageDiv: !!welcomeElement,
+        chatMessagesDiv: !!chatMessagesElement
+    });
+
+    const resolvedElements = {
+        historySessions: historySessionsElement || document.getElementById('historySessions'),
+        chatContainer: chatContainerElement || document.getElementById('chatContainer'),
+        welcomeMessageDiv: welcomeElement || document.getElementById('welcomeMessage'),
+        chatMessagesDiv: chatMessagesElement || document.getElementById('chatMessages')
+    };
+
+    if (!resolvedElements.historySessions || !resolvedElements.chatContainer) {
+        console.error('[session.js] startNewChat: Critical DOM elements missing after resolution.', resolvedElements);
+        showNotification("Lỗi giao diện người dùng khi tạo chat mới.", "error");
+        return false; // Indicate failure
     }
 
-    // Remove previous scroll listener if exists
-    if (currentScrollListener && chatContainerElement) {
-        chatContainerElement.removeEventListener('scroll', currentScrollListener);
+    // Create missing non-critical elements defensively
+    if (!resolvedElements.welcomeMessageDiv && resolvedElements.chatContainer) {
+        // ... (create welcome message logic)
+    }
+    if (!resolvedElements.chatMessagesDiv && resolvedElements.chatContainer) {
+       // ... (create chat messages logic)
+    }
+
+    if (currentScrollListener && resolvedElements.chatContainer) {
+        resolvedElements.chatContainer.removeEventListener('scroll', currentScrollListener);
     }
     currentScrollListener = null;
 
-    if (isLoading) return;
+    if (isLoading) {
+        console.warn("[session.js] startNewChat called while already loading.");
+        return false; // Indicate failure
+    }
     isLoading = true;
+    console.log("[session.js] startNewChat setting isLoading=true.");
     const defaultTitle = "Cuộc trò chuyện mới";
     const userInfo = getUserInfo();
     const userId = userInfo?.data?.userId;
@@ -623,20 +684,23 @@ export async function startNewChat(domElements) {
     if (userId === undefined || userId === null) {
         console.error("[session.js] User ID missing for new chat.");
         showNotification("Lỗi xác thực người dùng.", "error");
-        isLoading = false; return;
+        isLoading = false; return false;
     }
 
     const requestBody = { userId: userId, title: defaultTitle };
+    let newSessionData = null; // Declare outside try
 
     try {
-        // Sử dụng fetchWithAuth cho POST request
-        const newSessionData = await fetchWithAuth(SESSIONS_API_ENDPOINT, {
+        console.log(`[session.js] Calling API to create new session at ${SESSIONS_API_ENDPOINT}`);
+        newSessionData = await fetchWithAuth(SESSIONS_API_ENDPOINT, {
             method: 'POST',
             body: requestBody
         });
+        console.log("[session.js] API response for new session:", JSON.stringify(newSessionData));
 
-        if (!newSessionData || typeof newSessionData.id === 'undefined') {
-             throw new Error('API không trả về ID cho session mới.');
+        if (!newSessionData || typeof newSessionData.id === 'undefined' || newSessionData.id === null) {
+             console.error("[session.js] Invalid ID received from new session API:", newSessionData);
+             throw new Error('API không trả về ID hợp lệ cho session mới.');
         }
 
         const newSession = {
@@ -647,50 +711,66 @@ export async function startNewChat(domElements) {
             lastUpdatedAt: newSessionData.lastUpdatedAt || new Date().toISOString(),
             messages: [],
             conversationId: newSessionData.conversationId || null,
-             // Initialize infinite scroll state for new session
              isLoadingOlder: false,
-             hasMoreOlder: false, // New chat has no older messages
+             hasMoreOlder: false,
              oldestMessageId: null
         };
         chatSessions.unshift(newSession);
-        currentSessionId = newSession.id;
+        currentSessionId = newSession.id; // Set the global variable
+        console.log(`[session.js] New session created. currentSessionId set to: ${currentSessionId}`);
         chatSessions.sort((a, b) => new Date(b.lastUpdatedAt).getTime() - new Date(a.lastUpdatedAt).getTime());
-        // Truyền historySessionsElement và các element khác vào updateHistorySidebar
-        updateHistorySidebar(chatSessions, currentSessionId, handleSelectSession, handleDeleteRequest, historySessionsElement, chatContainerElement, welcomeElement, chatMessagesElement);
-        // 1. Load (clear) the UI first
-        loadSessionUI(newSession, null, domElements); // Pass null for showWelcomeFn as we handle it below
+        
+        // Update sidebar immediately
+        console.log("[session.js] Updating history sidebar after new session creation.");
+        updateHistorySidebar(
+            chatSessions, 
+            currentSessionId, 
+            handleSelectSession, 
+            handleDeleteRequest, 
+            resolvedElements.historySessions,
+            resolvedElements.chatContainer,
+            resolvedElements.welcomeMessageDiv,
+            resolvedElements.chatMessagesDiv
+        );
+        
+        // Clear the chat area and prepare for welcome message
+        console.log("[session.js] Calling loadSessionUI for the new session.");
+        loadSessionUI(newSession, null, resolvedElements); // Pass null for handler
 
-        // 2. THEN, trigger the dynamic welcome message generation
+        // Trigger the dynamic welcome message
         if (showWelcomeMessageHandler) {
-            // Use try-catch as showWelcomeMessageHandler is async and might throw
+            console.log("[session.js] Calling showWelcomeMessageHandler.");
             try {
-                // No need to await if we don't need to wait for it to finish before proceeding
-                showWelcomeMessageHandler(domElements); 
+                showWelcomeMessageHandler(resolvedElements); 
             } catch (welcomeError) {
                 console.error('[session.js] Error calling showWelcomeMessageHandler:', welcomeError);
-                // Optionally show an error message in the chat area
-                if(chatContainerElement) {
-                    chatContainerElement.innerHTML = '<p class="text-center text-red-500 p-4">Lỗi khi hiển thị tin nhắn chào mừng.</p>';
+                if(resolvedElements.chatContainer) {
+                    resolvedElements.chatContainer.innerHTML = '<p class="text-center text-red-500 p-4">Lỗi khi hiển thị tin nhắn chào mừng.</p>';
                 }
             }
         } else {
-            console.warn('[session.js] showWelcomeMessageHandler not set. Cannot display dynamic welcome message.');
-            // UI is already cleared by loadSessionUI, maybe show a static text?
-            if(chatContainerElement) {
-                 chatContainerElement.innerHTML = '<p class="text-center text-secondary-500 p-4">Bắt đầu cuộc trò chuyện mới.</p>';
+            console.warn('[session.js] showWelcomeMessageHandler not set.');
+            if(resolvedElements.chatContainer) {
+                 resolvedElements.chatContainer.innerHTML = '<p class="text-center text-secondary-500 p-4">Bắt đầu cuộc trò chuyện mới.</p>';
             }
         }
-
-        // No scroll listener needed for a brand new chat initially
+        console.log("[session.js] startNewChat completed successfully.");
+        isLoading = false;
+        return true; // Indicate success
 
     } catch (error) {
-        console.error('[session.js] Error creating new chat:', error);
-         if (!error.message.includes('401')) {
+        console.error('[session.js] Error creating new chat via API:', error);
+         if (!error.message?.includes('401')) { // Check safely
             showNotification(error.message || 'Không thể tạo cuộc trò chuyện mới.', 'error');
          }
-    } finally {
-        isLoading = false;
-    }
+         // Ensure currentSessionId is null if creation failed
+         if (newSessionData && currentSessionId === newSessionData.id) {
+            currentSessionId = null;
+         }
+         console.log("[session.js] startNewChat finished with error.");
+         isLoading = false;
+         return false; // Indicate failure
+    } 
 }
 
 /**
@@ -705,8 +785,7 @@ export function handleDeleteRequest(sessionId, historySessionsElement, chatConta
     const sessionToDelete = chatSessions.find(s => s.id === sessionId);
     const sessionTitle = sessionToDelete?.title || "Cuộc trò chuyện này";
     showDeleteSessionDialog(sessionTitle, async () => {
-        // Truyền các tham số element vào deleteSession
-        await deleteSession(sessionId, historySessionsElement, chatContainerElement, welcomeElement, chatMessagesElement); // <<< Truyền params
+        await deleteSession(sessionId, historySessionsElement, chatContainerElement, welcomeElement, chatMessagesElement);
     });
 }
 
@@ -721,29 +800,31 @@ export function handleDeleteRequest(sessionId, historySessionsElement, chatConta
  */
 async function deleteSession(sessionId, historySessionsElement, chatContainerElement, welcomeElement, chatMessagesElement) {
     const apiUrl = `${SESSIONS_API_ENDPOINT}/${sessionId}`;
+    console.log(`[session.js] Attempting to delete session ${sessionId} via API: ${apiUrl}`);
 
     try {
-        // Sử dụng fetchWithAuth cho DELETE request, không mong đợi JSON body
         await fetchWithAuth(apiUrl, { method: 'DELETE' }, false);
-
+        console.log(`[session.js] Session ${sessionId} deleted successfully via API.`);
         showNotification('Đã xóa phiên chat thành công.', 'success');
 
         const deletedIndex = chatSessions.findIndex(session => session.id === sessionId);
         if(deletedIndex > -1) chatSessions.splice(deletedIndex, 1);
+        console.log(`[session.js] Session ${sessionId} removed from local state.`);
 
         if (currentSessionId === sessionId) {
+            console.log(`[session.js] Deleted the current session. Selecting new session or starting new chat.`);
             currentSessionId = null;
             if (chatSessions.length > 0) {
                 chatSessions.sort((a, b) => new Date(b.lastUpdatedAt).getTime() - new Date(a.lastUpdatedAt).getTime());
                 const newCurrentId = chatSessions[0].id;
-                // Truyền các tham số element vào loadSessionMessages
-                await loadSessionMessages(newCurrentId, historySessionsElement, chatContainerElement, welcomeElement, chatMessagesElement); // loadSessionMessages sẽ cập nhật sidebar
+                console.log(`[session.js] Selecting next session: ${newCurrentId}`);
+                await loadSessionMessages(newCurrentId, historySessionsElement, chatContainerElement, welcomeElement, chatMessagesElement);
             } else {
-                // Truyền các tham số element vào startNewChat
+                console.log(`[session.js] No sessions left after deletion. Starting new chat.`);
                 await startNewChat({ historySessions: historySessionsElement, chatContainer: chatContainerElement, welcomeMessageDiv: welcomeElement, chatMessagesDiv: chatMessagesElement });
             }
         } else {
-            // Truyền historySessionsElement và các element khác vào updateHistorySidebar
+            console.log(`[session.js] Deleted session ${sessionId} was not the current one. Updating sidebar.`);
             updateHistorySidebar(chatSessions, currentSessionId, handleSelectSession, handleDeleteRequest, historySessionsElement, chatContainerElement, welcomeElement, chatMessagesElement);
         }
     } catch (error) {
@@ -751,7 +832,6 @@ async function deleteSession(sessionId, historySessionsElement, chatContainerEle
         if (!error.message.includes('401')) {
            showNotification(error.message || 'Lỗi khi xóa phiên chat.', 'error');
         }
-        // Không throw lại lỗi để không làm crash luồng dialog
     }
 }
 
@@ -765,19 +845,20 @@ async function deleteSession(sessionId, historySessionsElement, chatContainerEle
  * @param {HTMLElement} chatMessagesElement - Tham chiếu đến div bao ngoài khu vực chat.
  */
 export async function handleSelectSession(sessionId, historySessionsElement, chatContainerElement, welcomeElement, chatMessagesElement) {
+    console.log(`[session.js] handleSelectSession called for sessionId: ${sessionId}`);
     if (sessionId && sessionId !== currentSessionId) {
+        console.log(`[session.js] Selecting new session: ${sessionId}. Current was: ${currentSessionId}`);
 
-        // Remove previous scroll listener before loading new session
         if (currentScrollListener && chatContainerElement) {
+            console.log("[session.js] Removing previous scroll listener before selecting new session.");
             chatContainerElement.removeEventListener('scroll', currentScrollListener);
             currentScrollListener = null;
         }
 
-        // Truyền các tham số element vào loadSessionMessages để tải initial load
         await loadSessionMessages(sessionId, historySessionsElement, chatContainerElement, welcomeElement, chatMessagesElement);
-        // loadSessionMessages now handles updating the sidebar highlight and adding the new listener
+
     } else if (sessionId === currentSessionId) {
-         // Do nothing
+         console.log(`[session.js] Session ${sessionId} is already selected. Doing nothing.`);
     } else {
          console.warn(`[session.js] handleSelectSession called with invalid sessionId: ${sessionId}`);
     }

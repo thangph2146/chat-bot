@@ -337,11 +337,38 @@ export function loadSessionUI(session, showWelcomeFn, domElements) {
  */
 export function showWelcomeScreen(onStartChat, welcomeElement, chatContainer, chatMessagesElement) {
     console.log("[ui.js] Showing welcome screen");
-    if (!welcomeElement || !chatContainer || !chatMessagesElement) {
-        console.error("[ui.js] Missing required elements for showWelcomeScreen:", { 
+    
+    // Check if elements exist and resolve them if missing
+    if (!welcomeElement) {
+        welcomeElement = document.getElementById('welcomeMessage');
+        console.warn("[ui.js] welcomeElement was null, attempting to find it by ID:", !!welcomeElement);
+    }
+    
+    if (!chatContainer) {
+        chatContainer = document.getElementById('chatContainer');
+        console.warn("[ui.js] chatContainer was null, attempting to find it by ID:", !!chatContainer);
+    }
+    
+    if (!chatMessagesElement) {
+        chatMessagesElement = document.getElementById('chatMessages');
+        console.warn("[ui.js] chatMessagesElement was null, attempting to find it by ID:", !!chatMessagesElement);
+        
+        // If still null, create it if we have chatContainer
+        if (!chatMessagesElement && chatContainer) {
+            console.log("[ui.js] Creating missing chatMessagesElement");
+            const newChatMessagesDiv = document.createElement('div');
+            newChatMessagesDiv.id = 'chatMessages';
+            newChatMessagesDiv.className = 'flex flex-col gap-4 w-full';
+            chatContainer.appendChild(newChatMessagesDiv);
+            chatMessagesElement = newChatMessagesDiv;
+        }
+    }
+    
+    // Final check if required elements now exist
+    if (!welcomeElement || !chatContainer) {
+        console.error("[ui.js] Critical elements still missing for showWelcomeScreen after resolution attempts:", { 
             welcomeElement: !!welcomeElement,
-            chatContainer: !!chatContainer,
-            chatMessagesElement: !!chatMessagesElement
+            chatContainer: !!chatContainer
         });
         return;
     }
@@ -350,8 +377,11 @@ export function showWelcomeScreen(onStartChat, welcomeElement, chatContainer, ch
     welcomeElement.style.display = 'flex';
     welcomeElement.classList.remove('hidden');
     
-    // Ẩn khu vực chat
-    chatMessagesElement.classList.add('hidden');
+    // Ẩn khu vực chat (with null check)
+    if (chatMessagesElement) {
+        chatMessagesElement.classList.add('hidden');
+    }
+    
     chatContainer.innerHTML = ''; 
     
     // Cấu hình các phần tử cha để hiển thị đúng
@@ -433,10 +463,32 @@ export function showWelcomeScreen(onStartChat, welcomeElement, chatContainer, ch
  * @param {HTMLElement} chatMessagesElement - Phần tử DOM chứa tin nhắn chat.
  */
 export function hideWelcomeScreen(welcomeElement, chatMessagesElement) {
-    if (!welcomeElement || !chatMessagesElement) return;
+    // Try to find elements if they are null
+    if (!welcomeElement) {
+        welcomeElement = document.getElementById('welcomeMessage');
+    }
     
-    welcomeElement.classList.add('hidden');
-    chatMessagesElement.classList.remove('hidden');
+    if (!chatMessagesElement) {
+        chatMessagesElement = document.getElementById('chatMessages');
+        
+        // If still null, don't proceed with toggling classes
+        if (!chatMessagesElement) {
+            console.error("[ui.js] hideWelcomeScreen: chatMessagesElement not found");
+            // At least hide welcome screen if it exists
+            if (welcomeElement) {
+                welcomeElement.classList.add('hidden');
+            }
+            return;
+        }
+    }
+    
+    if (welcomeElement) {
+        welcomeElement.classList.add('hidden');
+    }
+    
+    if (chatMessagesElement) {
+        chatMessagesElement.classList.remove('hidden');
+    }
 }
 
 /**
