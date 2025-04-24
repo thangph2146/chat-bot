@@ -151,12 +151,32 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     if (domElements.newChatButton) {
-        domElements.newChatButton.addEventListener('click', () => startNewChat(domElements));
+        domElements.newChatButton.addEventListener('click', async () => {
+            const result = await startNewChat(domElements);
+            if (result.success && result.needsInitialMessage) {
+                if(domElements.messageInput) {
+                    domElements.messageInput.value = "Bắt đầu cuộc trò chuyện mới";
+                    handleSendMessage(domElements);
+                } else {
+                    console.warn("[main.js] Cannot send initial message: messageInput not found.");
+                }
+            }
+        });
     } else {
         console.warn("[main.js] newChatButton not found.");
     }
     if (domElements.newChatButtonSidebar) {
-        domElements.newChatButtonSidebar.addEventListener('click', () => startNewChat(domElements));
+        domElements.newChatButtonSidebar.addEventListener('click', async () => {
+            const result = await startNewChat(domElements);
+            if (result.success && result.needsInitialMessage) {
+                if(domElements.messageInput) {
+                    domElements.messageInput.value = "Bắt đầu cuộc trò chuyện mới";
+                    handleSendMessage(domElements);
+                } else {
+                    console.warn("[main.js] Cannot send initial message: messageInput not found.");
+                }
+            }
+        });
     } else {
         console.warn("[main.js] newChatButtonSidebar not found.");
     }

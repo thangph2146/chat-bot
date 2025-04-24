@@ -1,22 +1,31 @@
 // File xử lý màn hình chào mừng
+
+import { handleSendMessage } from './chat/chat.js'; // Import handleSendMessage
+import { getCurrentSessionId } from './chat/session.js'; // Import getCurrentSessionId
+
+// Store references to elements once the DOM is loaded
+let welcomeDivRef = null;
+let messagesDivRef = null;
+
 document.addEventListener('DOMContentLoaded', function() {
     const chatContainer = document.getElementById('chatContainer');
-    const chatMessages = document.getElementById('chatMessages');
-    const welcomeMessageDiv = document.getElementById('welcomeMessage');
+    // Assign to the stored references
+    welcomeDivRef = document.getElementById('welcomeMessage'); 
+    messagesDivRef = document.getElementById('chatMessages');
+    
     const startChatButton = document.getElementById('startChatButton');
 
     if (!chatContainer) {
         console.error("#chatContainer not found!");
         return;
     }
-    if (!welcomeMessageDiv) {
+    // Check the references
+    if (!welcomeDivRef) { 
         console.error("#welcomeMessage not found inside chatContainer!");
-        // Optional: Add fallback logic here if needed, but rely on HTML structure first
         return;
     }
-    if (!chatMessages) {
+    if (!messagesDivRef) { 
         console.error("#chatMessages not found!");
-        // Continue if possible, but log the error
     }
     if (!startChatButton) {
         console.error("#startChatButton not found inside welcomeMessage!");
@@ -25,73 +34,109 @@ document.addEventListener('DOMContentLoaded', function() {
 
 
     // Ensure welcome message is visible and chat messages are hidden initially
-    welcomeMessageDiv.style.display = 'flex'; // Use flex as per HTML
-    if (chatMessages) {
-        chatMessages.classList.add('hidden');
+    welcomeDivRef.style.display = 'flex'; // Use flex as per HTML
+    if (messagesDivRef) {
+        messagesDivRef.classList.add('hidden');
     }
 
     // Add event listener for the start chat button
     startChatButton.addEventListener('click', function() {
 
-        // Hide welcome message
-        welcomeMessageDiv.style.display = 'none';
-
-        // Show chat messages area
-        if (chatMessages) {
-            chatMessages.classList.remove('hidden');
-        } else {
-            console.warn("Cannot show chatMessages, element not found.");
+        // Hide welcome message using the reference
+        if (welcomeDivRef) {
+            welcomeDivRef.style.display = 'none';
         }
 
-        // Dynamically import and call startNewChat from session.js
-        import('./chat/session.js')
-            .then(sessionModule => {
-                if (sessionModule && typeof sessionModule.startNewChat === 'function') {
-                    // Gather necessary DOM elements for startNewChat (ensure these exist)
-                    const domElements = {
-                        chatContainer: chatContainer,
-                        messageInput: document.getElementById('messageInput'),
-                        sendButton: document.getElementById('sendButton'),
-                        newChatButton: document.getElementById('newChatButton'),
-                        newChatButtonSidebar: document.getElementById('newChatButtonSidebar'),
-                        recordButton: document.getElementById('recordButton'),
-                        historySessions: document.getElementById('historySessions'),
-                        chatMessagesDiv: chatMessages, // Already found
-                        welcomeMessageDiv: welcomeMessageDiv, // Already found
-                        userInfoDisplay: document.getElementById('userInfoDisplay')
-                    };
+        // Show chat messages area using the reference
+        if (messagesDivRef) {
+            messagesDivRef.classList.remove('hidden');
+        } else {
+            console.warn("Cannot show chatMessages, element reference not found.");
+            // If chat messages div isn't even found, we probably can't send a message
+            return; 
+        }
 
-                    // Minimal check for essential elements passed to startNewChat
-                    if (!domElements.historySessions || !domElements.chatMessagesDiv) {
-                        console.error("Missing essential DOM elements for startNewChat:", domElements);
-                        return;
-                    }
-                    sessionModule.startNewChat(domElements);
-                } else {
-                    console.error("startNewChat function not found in session.js module.");
-                }
-            })
-            .catch(err => {
-                console.error("Error importing or executing session.js:", err);
-            });
+        // --- Send the initial message --- 
+        const currentSessId = getCurrentSessionId();
+        const messageInputRef = document.getElementById('messageInput'); // Find input element
+        const chatContainerRef = document.getElementById('chatContainer'); // Find chat container
+        const historySessionsRef = document.getElementById('historySessions'); // <<< GET HISTORY SESSIONS REF
+
+        if (currentSessId && messageInputRef && welcomeDivRef && messagesDivRef && chatContainerRef && historySessionsRef) { 
+            // Prepare the domElements object required by handleSendMessage
+            const domElementsForSend = {
+                messageInput: messageInputRef,
+                chatMessagesDiv: messagesDivRef, 
+                welcomeMessageDiv: welcomeDivRef,
+                chatContainer: chatContainerRef,
+                historySessions: historySessionsRef, // <<< ADD HISTORY SESSIONS
+                // Add other elements if handleSendMessage requires them in the future
+                // e.g., userInfoDisplay, logoutButton if needed by downstream functions
+            };
+
+            // Set the message content
+            messageInputRef.value = "Bắt đầu cuộc trò chuyện";
+
+            // Call handleSendMessage
+            handleSendMessage(domElementsForSend);
+
+            // Clear the input field immediately after calling send
+            messageInputRef.value = ''; 
+
+        } else {
+            // Update the warning message
+            console.warn("[welcome-screen.js] Cannot send initial message. Missing SessionID, messageInput, welcomeDiv, messagesDiv, chatContainer, or historySessions.", 
+                { currentSessId, messageInputRef, welcomeDivRef, messagesDivRef, chatContainerRef, historySessionsRef });
+        }
     });
 });
 
 // Function to explicitly show the welcome screen (e.g., called by main.js or auth.js)
 window.showWelcomeScreen = function() {
-    const welcomeDiv = document.getElementById('welcomeMessage');
-    const messagesDiv = document.getElementById('chatMessages');
-
-    if (welcomeDiv) {
-        welcomeDiv.style.display = 'flex';
+    // Use the stored references
+    if (welcomeDivRef) {
+        // We might need to re-add the welcomeDivRef to the chatContainer 
+        // if it was previously removed by innerHTML clearing.
+        const chatContainer = document.getElementById('chatContainer'); // Find container again
+        if (chatContainer && !chatContainer.contains(welcomeDivRef)) {
+             // Ensure chat messages are removed first if they exist and are present
+            if (messagesDivRef && chatContainer.contains(messagesDivRef)) {
+                chatContainer.removeChild(messagesDivRef);
+            }
+             // Add welcome message back
+            chatContainer.appendChild(welcomeDivRef);
+        }
+        welcomeDivRef.style.display = 'flex';
     } else {
-        console.error("Cannot show welcome screen: #welcomeMessage not found.");
+        console.error("Cannot show welcome screen: #welcomeMessage reference is null.");
     }
 
-    if (messagesDiv) {
-        messagesDiv.classList.add('hidden');
-        messagesDiv.innerHTML = ''; // Clear previous messages when showing welcome screen
+    // Hide chat messages using the reference (it might not be in the DOM anymore, which is fine)
+    if (messagesDivRef) {
+        messagesDivRef.classList.add('hidden');
+        // Also remove it from DOM if it exists to avoid duplicate content later
+         if (messagesDivRef.parentNode) {
+             messagesDivRef.parentNode.removeChild(messagesDivRef);
+         }
+         // Clear its content just in case it gets re-added later improperly
+        messagesDivRef.innerHTML = ''; 
     } else {
-        console.warn("Cannot hide chat messages: #chatMessages not found.");
+        // This warning is less critical now, as we primarily work with welcomeDivRef
+        // console.warn("Cannot hide chat messages: #chatMessages reference is null.");
+    }
+
+    // Ensure the main chat container has no other stray content (like error messages)
+    const chatContainer = document.getElementById('chatContainer');
+    if (chatContainer && chatContainer.firstChild && chatContainer.firstChild !== welcomeDivRef) {
+        // If the first child isn't the welcome screen, clear it before showing welcome.
+        // This handles cases where error messages were injected.
+        // Be careful not to remove welcomeDivRef itself if it's already the first child.
+        while (chatContainer.firstChild && chatContainer.firstChild !== welcomeDivRef) {
+            chatContainer.removeChild(chatContainer.firstChild);
+        }
+        // If welcomeDivRef wasn't already there, add it.
+        if (!chatContainer.contains(welcomeDivRef)) {
+             chatContainer.appendChild(welcomeDivRef);
+        }
     }
 };

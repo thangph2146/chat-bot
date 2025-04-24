@@ -295,13 +295,14 @@ export async function loadChatSessions(domElements) {
  * @param {HTMLElement} chatContainerElement - Tham chiếu đến div chứa tin nhắn (scrollable).
  * @param {HTMLElement} welcomeElement - Tham chiếu đến div welcome tĩnh.
  * @param {HTMLElement} chatMessagesElement - Tham chiếu đến div bao ngoài khu vực chat (parent of container).
+ * @returns {Promise<boolean>} True nếu session được tải và không có tin nhắn (cần lời chào), False nếu có tin nhắn hoặc lỗi.
  */
 export async function loadSessionMessages(sessionId, historySessionsElement, chatContainerElement, welcomeElement, chatMessagesElement) {
     const targetSession = chatSessions.find(s => s.id === sessionId);
     if (!targetSession) {
         console.error(`[session.js] Session ${sessionId} not found locally for initial load.`);
         showNotification('Không tìm thấy phiên chat cục bộ.', 'error');
-        return;
+        return false;
     }
 
     // Reset session state for loading older messages
@@ -325,52 +326,69 @@ export async function loadSessionMessages(sessionId, historySessionsElement, cha
     const initialMessagesCount = 5;
     const messagesApiUrl = `${CHAT_MESSAGE_API_ENDPOINT}/session/${sessionId}/recent?count=${initialMessagesCount}`;
 
+    // Show loading indicator, but keep welcome screen visible initially
     if (chatContainerElement) {
          chatContainerElement.innerHTML = '<p class="text-center text-secondary-500 p-4">Đang tải tin nhắn...</p>'; // Show loading message
     }
-    // Ensure welcome screen is hidden
-    if (welcomeElement) {
-        welcomeElement.style.display = 'none';
-    }
-    // Ensure chat message area is visible
-    if (chatMessagesElement) {
-        chatMessagesElement.classList.remove('hidden');
-    }
+    // Do NOT hide welcome screen or show chat messages area yet
 
     try {
         const initialMessages = await fetchWithAuth(messagesApiUrl);
 
         if (!Array.isArray(initialMessages)) {
              console.error(`[session.js] Invalid messages data received for session ${sessionId}:`, initialMessages);
-             throw new Error('Định dạng dữ liệu tin nhắn không hợp lệ');
+             showNotification('Lỗi định dạng dữ liệu tin nhắn.', 'error');
+             if (chatContainerElement) chatContainerElement.innerHTML = ''; // Clear loading message on error
+             window.showWelcomeScreen(); // Show welcome screen on error
+             return false;
         }
 
-        try {
-             const mappedMessages = initialMessages.map(apiMsg => {
-                 if (!apiMsg || typeof apiMsg.content === 'undefined') return null;
-                 return {
-                     id: apiMsg.id,
-                     senderName: apiMsg.senderName || (apiMsg.isUser ? 'Người dùng' : 'Bot'),
-                     isUser: Boolean(apiMsg.isUser),
-                     content: apiMsg.content,
-                     timestamp: apiMsg.timestamp || new Date().toISOString()
-                 };
-             }).filter(msg => msg !== null)
-               .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+        const mappedMessages = initialMessages.map(apiMsg => {
+            if (!apiMsg || typeof apiMsg.content === 'undefined') return null;
+            return {
+                id: apiMsg.id,
+                senderName: apiMsg.senderName || (apiMsg.isUser ? 'Người dùng' : 'Bot'),
+                isUser: Boolean(apiMsg.isUser),
+                content: apiMsg.content,
+                timestamp: apiMsg.timestamp || new Date().toISOString()
+            };
+        }).filter(msg => msg !== null)
+            .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+
+        // --- Logic check if messages are empty ---
+        if (mappedMessages.length === 0) {
+            console.log(`[session.js] Session ${sessionId} loaded with empty messages. Needs initial greeting.`);
+            targetSession.messages = []; // Ensure it's empty
+            targetSession.hasMoreOlder = false;
+            targetSession.oldestMessageId = null;
+
+            // Load the empty UI state (clears loading indicator)
+            const elementsForUI = { historySessions: historySessionsElement, chatContainer: chatContainerElement, welcomeMessageDiv: welcomeElement, chatMessagesDiv: chatMessagesElement };
+            loadSessionUI(targetSession, null, elementsForUI);
+
+            // *** ADDED: Explicitly show the welcome screen again ***
+            window.showWelcomeScreen();
+
+            return true; // <<< Indicate session is empty
+        } else {
+            // Messages exist, process them
+
+            // *** MOVED HERE: Hide welcome, show chat area ***
+            if (welcomeElement) {
+                welcomeElement.style.display = 'none';
+            }
+            if (chatMessagesElement) {
+                chatMessagesElement.classList.remove('hidden');
+            }
+            // *** ***
 
             targetSession.messages = mappedMessages;
-
-            if (mappedMessages.length > 0) {
-                targetSession.oldestMessageId = mappedMessages[0].id;
-            } else {
-                targetSession.hasMoreOlder = false;
-            }
-
+            targetSession.oldestMessageId = mappedMessages[0].id;
             if (mappedMessages.length < initialMessagesCount) {
                 targetSession.hasMoreOlder = false;
             }
-
-            // --- START: Update title based on last user message --- 
+            // Update title logic remains here...
+            // --- START: Update title based on last user message ---
             let lastUserMessage = null;
             for (let i = mappedMessages.length - 1; i >= 0; i--) {
                 if (mappedMessages[i].isUser) {
@@ -383,48 +401,39 @@ export async function loadSessionMessages(sessionId, historySessionsElement, cha
                 const userContent = lastUserMessage.content?.trim() || '';
                 if (userContent) {
                     const potentialNewTitle = userContent.length > 30
-                                              ? userContent.substring(0, 27) + '...'
-                                              : userContent;
+                                                ? userContent.substring(0, 27) + '...'
+                                                : userContent;
                     if (potentialNewTitle !== targetSession.title) {
-                         const tempDomElements = {
-                             historySessions: historySessionsElement,
-                             chatContainer: chatContainerElement,
-                             welcomeMessageDiv: welcomeElement,
-                             chatMessagesDiv: chatMessagesElement
-                         };
-                        updateCurrentSessionTitle(potentialNewTitle, tempDomElements);
+                            const tempDomElements = {
+                                historySessions: historySessionsElement,
+                                chatContainer: chatContainerElement,
+                                welcomeMessageDiv: welcomeElement,
+                                chatMessagesDiv: chatMessagesElement
+                            };
+                            updateCurrentSessionTitle(potentialNewTitle, tempDomElements);
                     }
                 }
             }
-            // --- END: Update title --- 
+            // --- END: Update title ---
 
-        } catch (mapSortError) {
-             console.error(`[session.js] Error processing initial messages for ${sessionId}:`, mapSortError);
-             throw new Error('Lỗi xử lý dữ liệu tin nhắn ban đầu.');
+            // Load the UI with the fetched messages
+            const elementsForUI = { historySessions: historySessionsElement, chatContainer: chatContainerElement, welcomeMessageDiv: welcomeElement, chatMessagesDiv: chatMessagesElement };
+            loadSessionUI(targetSession, null, elementsForUI); // Pass null for showWelcomeMessageHandler here
+
+            // Add scroll listener AFTER UI is loaded and messages exist
+            if (targetSession.hasMoreOlder && chatContainerElement) {
+                const scrollListener = async (event) => {
+                    if (event.target.scrollTop <= 50) {
+                        await loadOlderMessages(sessionId, chatContainerElement);
+                    }
+                };
+                chatContainerElement.addEventListener('scroll', scrollListener);
+                currentScrollListener = scrollListener;
+            } else {
+                console.log("[session.js] Not adding scroll listener (hasMoreOlder=false or chatContainerElement missing).");
+            }
+            return false; // <<< Indicate session is NOT empty
         }
-
-        // Load the UI with the initial messages
-        const elementsForUI = {
-            historySessions: historySessionsElement,
-            chatContainer: chatContainerElement,
-            welcomeMessageDiv: welcomeElement,
-            chatMessagesDiv: chatMessagesElement
-        };
-        loadSessionUI(targetSession, null, elementsForUI); // Pass null for showWelcomeMessageHandler here
-
-        // Add scroll listener AFTER UI is loaded
-        if (targetSession.hasMoreOlder && chatContainerElement) {
-            const scrollListener = async (event) => {
-                if (event.target.scrollTop <= 50) {
-                    await loadOlderMessages(sessionId, chatContainerElement);
-                }
-            };
-            chatContainerElement.addEventListener('scroll', scrollListener);
-            currentScrollListener = scrollListener;
-        } else {
-             console.log("[session.js] Not adding scroll listener (hasMoreOlder=false or chatContainerElement missing).");
-        }
-
     } catch (error) {
         console.error(`[session.js] Error in initial loadSessionMessages for ${sessionId}:`, error);
          if (!error.message.includes('401')) {
@@ -435,6 +444,9 @@ export async function loadSessionMessages(sessionId, historySessionsElement, cha
          }
         targetSession.messages = [];
         targetSession.hasMoreOlder = false;
+        // *** ADDED: Show welcome screen on error too ***
+        window.showWelcomeScreen();
+        return false; // Indicate failure (implicitly not empty for greeting purposes)
     }
 }
 
@@ -576,7 +588,7 @@ async function loadOlderMessages(sessionId, chatContainerElement) {
  * Sử dụng fetchWithAuth.
  * @param {object} domElements - Đối tượng chứa các tham chiếu đến phần tử DOM quan trọng.
  *        (historySessions, chatContainer, welcomeMessageDiv, chatMessagesDiv)
- * @returns {Promise<boolean>} True nếu tạo và xử lý thành công, False nếu có lỗi.
+ * @returns {Promise<object>} Object dạng { success: boolean, needsInitialMessage?: boolean }.
  */
 export async function startNewChat(domElements) {
     // Trích xuất các element cần thiết từ domElements
@@ -595,7 +607,7 @@ export async function startNewChat(domElements) {
     if (!resolvedElements.historySessions || !resolvedElements.chatContainer) {
         console.error('[session.js] startNewChat: Critical DOM elements missing after resolution.', resolvedElements);
         showNotification("Lỗi giao diện người dùng khi tạo chat mới.", "error");
-        return false; // Indicate failure
+        return { success: false }; // Indicate failure
     }
 
     // Create missing non-critical elements defensively
@@ -613,7 +625,7 @@ export async function startNewChat(domElements) {
 
     if (isLoading) {
         console.warn("[session.js] startNewChat called while already loading.");
-        return false; // Indicate failure
+        return { success: false }; // Indicate failure
     }
     isLoading = true;
     const defaultTitle = "Cuộc trò chuyện mới";
@@ -623,7 +635,8 @@ export async function startNewChat(domElements) {
     if (userId === undefined || userId === null) {
         console.error("[session.js] User ID missing for new chat.");
         showNotification("Lỗi xác thực người dùng.", "error");
-        isLoading = false; return false;
+        isLoading = false;
+        return { success: false };
     }
 
     const requestBody = { userId: userId, title: defaultTitle };
@@ -640,17 +653,21 @@ export async function startNewChat(domElements) {
              throw new Error('API không trả về ID hợp lệ cho session mới.');
         }
 
+        // --- Create the initial bot greeting message --- 
+        // const initialBotMessage = { ... }; // <<< REMOVED
+        // -----------------------------------------------
+
         const newSession = {
             id: newSessionData.id,
             userId: newSessionData.userId || userId,
             title: newSessionData.title || defaultTitle,
             createdAt: newSessionData.createdAt || new Date().toISOString(),
             lastUpdatedAt: newSessionData.lastUpdatedAt || new Date().toISOString(),
-            messages: [],
+            messages: [], // Start with empty messages
             conversationId: newSessionData.conversationId || null,
              isLoadingOlder: false,
-             hasMoreOlder: false,
-             oldestMessageId: null
+             hasMoreOlder: false, // No older messages for a new chat
+             oldestMessageId: null // No messages initially
         };
         chatSessions.unshift(newSession);
         currentSessionId = newSession.id; // Set the global variable
@@ -668,10 +685,14 @@ export async function startNewChat(domElements) {
             resolvedElements.chatMessagesDiv
         );
         
-        // Clear the chat area and prepare for welcome message
+        // Load the UI, which will now include the initial message
+        // loadSessionUI will hide the static welcome message because the session has a message.
         loadSessionUI(newSession, null, resolvedElements); // Pass null for handler
 
-        // Trigger the dynamic welcome message
+        // The dynamic welcome message handler is likely not needed anymore here,
+        // as the initial message is directly added to the chat.
+        // Commenting out the call:
+        /*
         if (showWelcomeMessageHandler) {
             try {
                 showWelcomeMessageHandler(resolvedElements); 
@@ -687,8 +708,9 @@ export async function startNewChat(domElements) {
                  resolvedElements.chatContainer.innerHTML = '<p class="text-center text-secondary-500 p-4">Bắt đầu cuộc trò chuyện mới.</p>';
             }
         }
+        */
         isLoading = false;
-        return true; // Indicate success
+        return { success: true, needsInitialMessage: true }; // Indicate success and need for initial message
 
     } catch (error) {
         console.error('[session.js] Error creating new chat via API:', error);
@@ -700,7 +722,7 @@ export async function startNewChat(domElements) {
             currentSessionId = null;
          }
          isLoading = false;
-         return false; // Indicate failure
+         return { success: false }; // Indicate failure
     } 
 }
 
