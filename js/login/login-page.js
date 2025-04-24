@@ -1,5 +1,5 @@
 ﻿// js/login-page.js
-import { handleLogin, handleGoogleVerifyToken } from './login.js'; // Import hàm xác thực token mới
+import { handleGoogleVerifyToken } from './login.js'; // Chỉ import hàm xác thực token Google
 import { checkAuthentication } from '../chat/auth.js'; // Import checkAuthentication
 import { GOOGLE_CLIENT_ID } from '../chat/config.js'; // Chỉ import Client ID
 
@@ -11,17 +11,6 @@ if (checkAuthentication()) {
 // --- Hàm Callback từ Google Sign-In --- 
 async function handleGoogleCredentialResponse(response) {
     const idToken = response.credential;
-
-    // --- Không cần giải mã idToken ở client nữa ---
-    // let googleID = null;
-    // let email = null;
-    // try {
-    //     // ... code giải mã cũ (KHÔNG AN TOÀN) ...
-    // } catch (decodeError) {
-    //     // ... xử lý lỗi giải mã cũ ...
-    //     return;
-    // }
-    // --- Kết thúc phần giải mã không an toàn ---
 
     // Lấy các element UI để hiển thị trạng thái chờ/lỗi
     const errorMessageDiv = document.getElementById('errorMessage');
@@ -79,35 +68,27 @@ async function handleGoogleCredentialResponse(response) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    const loginForm = document.getElementById('loginForm');
-    const emailInput = document.getElementById('email');
-    const passwordInput = document.getElementById('password');
+    // Chỉ lấy các element cần thiết cho Google Sign-In và thông báo lỗi
     const errorMessageDiv = document.getElementById('errorMessage');
     const errorTextElement = document.getElementById('errorText');
-    const submitButton = document.getElementById('loginSubmitButton');
-    const buttonText = submitButton ? submitButton.querySelector('.button-text') : null;
-    const buttonSpinner = submitButton ? submitButton.querySelector('.button-spinner') : null;
-
-    // Lấy div chứa nút Google (theo cập nhật html)
     const googleSignInButtonDiv = document.getElementById('googleSignInButtonDiv');
 
-    // Check for necessary elements
-    if (!loginForm || !emailInput || !passwordInput || !errorMessageDiv || !errorTextElement || !submitButton || !buttonText || !buttonSpinner || !googleSignInButtonDiv) {
-        console.error("[login-page.js] Login page UI elements not found. Initialization failed.");
+    // Check for necessary elements for Google sign-in
+    if (!errorMessageDiv || !errorTextElement || !googleSignInButtonDiv) {
+        console.error("[login-page.js] Google Sign-In UI elements not found. Initialization failed.");
         if (errorTextElement && errorMessageDiv) {
-            errorTextElement.textContent = 'Lỗi tải giao diện trang đăng nhập.';
+            errorTextElement.textContent = 'Lỗi tải giao diện đăng nhập Google.';
             errorMessageDiv.style.display = 'flex';
         }
         return;
     }
 
-    // Đảm bảo hàm handleLogin và handleGoogleVerifyToken đã được tải
-    if (typeof handleLogin !== 'function' || typeof handleGoogleVerifyToken !== 'function') { // Kiểm tra hàm mới
-        console.error("[login-page.js] CRITICAL ERROR: handleLogin() or handleGoogleVerifyToken() not found."); // Cập nhật thông báo lỗi
-        errorTextElement.textContent = 'Lỗi tải chức năng đăng nhập. Vui lòng thử lại.';
+    // Đảm bảo hàm handleGoogleVerifyToken đã được tải
+    if (typeof handleGoogleVerifyToken !== 'function') {
+        console.error("[login-page.js] CRITICAL ERROR: handleGoogleVerifyToken() not found.");
+        errorTextElement.textContent = 'Lỗi tải chức năng đăng nhập Google. Vui lòng thử lại.';
         errorMessageDiv.style.display = 'flex';
-        submitButton.disabled = true;
-        // Không cần disable nút Google vì nó được quản lý bởi thư viện
+        // Nút Google được quản lý bởi thư viện, không cần disable ở đây
         return;
     }
 
@@ -153,82 +134,11 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     };
 
-    // --- Xử lý Submit Form Email/Password (giữ nguyên logic cũ) --- 
-    loginForm.addEventListener('submit', async function(event) {
-        event.preventDefault();
+    // --- Xử lý Submit Form Email/Password đã bị xóa --- 
+    // loginForm.addEventListener('submit', async function(event) { ... });
 
-        const email = emailInput.value.trim().toLowerCase();
-        const password = passwordInput.value.trim();
-
-        errorMessageDiv.style.display = 'none';
-        errorTextElement.textContent = '';
-
-        if (!email || !password) {
-            errorTextElement.textContent = 'Vui lòng nhập email và mật khẩu.';
-            errorMessageDiv.style.display = 'flex';
-            return;
-        }
-
-        submitButton.disabled = true;
-        buttonText.textContent = 'Đang xử lý...';
-        buttonSpinner.classList.remove('hidden');
-
-        try {
-            const loginResult = await handleLogin(email, password);
-
-            if (loginResult.success) {
-                errorMessageDiv.style.display = 'none';
-                buttonText.textContent = 'Thành công!';
-                window.location.href = 'index.html';
-            } else {
-                console.error("[login-page.js] Standard login failed:");
-                errorTextElement.textContent = loginResult.message || 'Email hoặc mật khẩu không đúng.';
-                errorMessageDiv.style.display = 'flex';
-                passwordInput.value = '';
-                emailInput.focus();
-                loginForm.classList.add('animate-shake');
-                setTimeout(() => loginForm.classList.remove('animate-shake'), 500);
-                submitButton.disabled = false;
-                buttonText.textContent = 'Đăng nhập';
-                buttonSpinner.classList.add('hidden');
-            }
-        } catch (error) {
-            console.error("[login-page.js] Unexpected error during login form submission:", error);
-            errorTextElement.textContent = 'Đã xảy ra lỗi không mong muốn. Vui lòng thử lại.';
-            errorMessageDiv.style.display = 'flex';
-            submitButton.disabled = false;
-            buttonText.textContent = 'Đăng nhập';
-            buttonSpinner.classList.add('hidden');
-        }
-    });
-
-    // --- Định nghĩa animation shake (giữ nguyên) --- 
-    let shakeKeyframesDefined = false;
-    for (const sheet of document.styleSheets) {
-        try {
-            for (const rule of sheet.cssRules) {
-                if (rule.type === CSSRule.KEYFRAMES_RULE && rule.name === 'shake') {
-                    shakeKeyframesDefined = true;
-                    break;
-                }
-            }
-        } catch (e) { /* Ignore potential CORS errors */ }
-        if (shakeKeyframesDefined) break;
-    }
-    if (!shakeKeyframesDefined) {
-        const styleSheet = document.createElement("style");
-        styleSheet.type = "text/css";
-        styleSheet.innerText = `
-        @keyframes shake {
-          10%, 90% { transform: translate3d(-1px, 0, 0); }
-          20%, 80% { transform: translate3d(2px, 0, 0); }
-          30%, 50%, 70% { transform: translate3d(-3px, 0, 0); }
-          40%, 60% { transform: translate3d(3px, 0, 0); }
-        }
-        .animate-shake { animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both; }
-        `;
-        document.head.appendChild(styleSheet);
-    }
+    // --- Định nghĩa animation shake đã bị xóa --- 
+    // let shakeKeyframesDefined = false; ...
 
     // Cập nhật năm bản quyền (giữ nguyên)
     const copyrightYearElement = document.getElementById('copyrightYear');

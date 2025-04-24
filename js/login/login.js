@@ -1,53 +1,6 @@
-﻿import { AUTH_LOGIN_ENDPOINT, AUTH_GOOGLE_LOGIN_ENDPOINT, AUTH_GOOGLE_LOGIN_CUSTOM_ENDPOINT, AUTH_GOOGLE_VERIFY_ENDPOINT } from '../chat/config.js';
-import { getUserInfo as getUserInfoFromAuth, USER_DATA_KEY } from '../chat/auth.js'; // Correct path: Go up one level then into chat
-import { fetchWithAuth } from '../chat/api.js'; // Correct path: Go up one level then into chat
-import { showNotification } from '../chat/ui.js'; // Import showNotification for consistency
-
-/**
- * Gửi yêu cầu đăng nhập đến API.
- * @param {string} email
- * @param {string} password
- * @returns {Promise<{success: boolean, message?: string}>}
- */
-export async function handleLogin(email, password) {
-    const apiUrl = AUTH_LOGIN_ENDPOINT;
-    const requestBody = {
-        email: email,
-        password: password
-    };
-
-    try {
-        // Sử dụng fetchWithAuth
-        const responseData = await fetchWithAuth(apiUrl, {
-            method: 'POST',
-            body: requestBody // fetchWithAuth sẽ tự stringify nếu cần
-        });
-
-
-        // Validation cấu trúc response (điều chỉnh nếu API trả về khác)
-        if (!responseData || !responseData.data || !responseData.data.token || typeof responseData.data.userId === 'undefined') {
-            console.error('[login.js] API response missing expected data structure (data.token, data.userId).', responseData);
-            return { success: false, message: 'Dữ liệu đăng nhập trả về không hợp lệ.' };
-        }
-
-        try {
-            localStorage.setItem(USER_DATA_KEY, JSON.stringify(responseData));
-            return { success: true };
-        } catch (storageError) {
-            console.error('[login.js] Error storing login info to localStorage:', storageError);
-            // Vẫn trả về thành công vì đăng nhập API đã ok, chỉ là lưu trữ lỗi
-            return { success: true, message: 'Đăng nhập thành công nhưng lỗi lưu phiên.' };
-        }
-
-    } catch (error) {
-        // fetchWithAuth đã log lỗi chi tiết
-        console.error('[login.js] Login failed:', error);
-        // Không cần xóa localStorage ở đây vì fetchWithAuth đã xử lý 401
-        // localStorage.removeItem(USER_DATA_KEY);
-        // Trả về message từ lỗi đã được chuẩn hóa bởi fetchWithAuth hoặc lỗi mạng
-        return { success: false, message: error.message || 'Lỗi kết nối hoặc xử lý phía máy chủ.' };
-    }
-}
+﻿import { AUTH_GOOGLE_VERIFY_ENDPOINT } from '../chat/config.js';
+import { USER_DATA_KEY } from '../chat/auth.js';
+import { fetchWithAuth } from '../chat/api.js';
 
 /**
  * Gửi idToken nhận từ Google về backend để xác thực và đăng nhập.
@@ -69,7 +22,6 @@ export async function handleGoogleVerifyToken(idToken) {
             // bạn có thể cần thêm logic để bỏ qua header đó:
             // headers: { 'Authorization': undefined } 
         });
-
 
         // Kiểm tra cấu trúc response thành công từ backend
         if (!responseData || !responseData.data || !responseData.data.token || typeof responseData.data.userId === 'undefined') {
