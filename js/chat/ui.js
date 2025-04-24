@@ -336,8 +336,6 @@ export function loadSessionUI(session, showWelcomeFn, domElements) {
  * @param {HTMLElement} chatMessagesElement - Phần tử DOM chứa tin nhắn chat.
  */
 export function showWelcomeScreen(onStartChat, welcomeElement, chatContainer, chatMessagesElement) {
-    console.log("[ui.js] Showing welcome screen");
-    
     // Check if elements exist and resolve them if missing
     if (!welcomeElement) {
         welcomeElement = document.getElementById('welcomeMessage');
@@ -355,7 +353,6 @@ export function showWelcomeScreen(onStartChat, welcomeElement, chatContainer, ch
         
         // If still null, create it if we have chatContainer
         if (!chatMessagesElement && chatContainer) {
-            console.log("[ui.js] Creating missing chatMessagesElement");
             const newChatMessagesDiv = document.createElement('div');
             newChatMessagesDiv.id = 'chatMessages';
             newChatMessagesDiv.className = 'flex flex-col gap-4 w-full';
@@ -394,9 +391,7 @@ export function showWelcomeScreen(onStartChat, welcomeElement, chatContainer, ch
     }
     
     // Nếu welcomeElement bị ẩn trong CSS, hiển thị nó
-    console.log("[ui.js] Welcome element display style:", window.getComputedStyle(welcomeElement).display);
     if (window.getComputedStyle(welcomeElement).display === 'none') {
-        console.log("[ui.js] Forcing welcome element to display flex");
         welcomeElement.style.display = 'flex';
     }
     
@@ -407,11 +402,9 @@ export function showWelcomeScreen(onStartChat, welcomeElement, chatContainer, ch
     if (!startChatButton) {
         // Nếu không tìm thấy nút, thử tìm bằng cách sử dụng DOM chung
         startChatButton = document.getElementById('startChatButton');
-        console.log("[ui.js] Looking for button in entire DOM:", !!startChatButton);
     }
     
     if (startChatButton) {
-        console.log("[ui.js] Start chat button found, configuring it");
         // Đảm bảo nút hiển thị
         startChatButton.style.display = 'flex';
         startChatButton.classList.add('animate-pulse');
@@ -425,7 +418,6 @@ export function showWelcomeScreen(onStartChat, welcomeElement, chatContainer, ch
         // Thêm event listener mới
         newButton.addEventListener('click', (e) => {
             e.preventDefault();
-            console.log("[ui.js] Start chat button clicked");
             if (typeof onStartChat === 'function') {
                 onStartChat();
             }
@@ -446,7 +438,6 @@ export function showWelcomeScreen(onStartChat, welcomeElement, chatContainer, ch
         
         newButton.addEventListener('click', (e) => {
             e.preventDefault();
-            console.log("[ui.js] Start chat button clicked (newly created)");
             if (typeof onStartChat === 'function') {
                 onStartChat();
             }

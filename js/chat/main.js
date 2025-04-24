@@ -45,13 +45,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         userInfoDisplay: document.getElementById('userInfoDisplay')
     };
     
-    // Debug log to see what elements were found
-    console.log("[main.js] DOM elements gathered:", {
-        chatContainer: !!domElements.chatContainer,
-        chatMessagesDiv: !!domElements.chatMessagesDiv,
-        welcomeMessageDiv: !!domElements.welcomeMessageDiv,
-        historySessions: !!domElements.historySessions
-    });
     
     // Basic check for essential containers
     if (!domElements.chatContainer || !domElements.historySessions) {
@@ -85,15 +78,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // 4. Load Initial Session Data (Fetch & Process Only)
     // Pass the entire domElements object now
-    console.log("[main.js] Calling loadChatSessions...");
     const loadSuccess = await loadChatSessions(domElements); // Pass the whole object
-    console.log(`[main.js] loadChatSessions completed. Success: ${loadSuccess}`);
 
     // 5. Update UI Based on Load Result
     if (loadSuccess) {
         const sessions = getAllSessions();
         const initialSessionId = getCurrentSessionId(); // Get ID *after* loadChatSessions potentially created one
-        console.log(`[main.js] Sessions loaded. Count: ${sessions.length}, Initial Session ID: ${initialSessionId}`);
 
         // Update sidebar (always do this after load)
         updateHistorySidebar(
@@ -112,7 +102,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             // Note: If it was newly created by startNewChat, loadSessionMessages might be called
             //       redundantly, but loadSessionMessages clears the container anyway.
             //       Alternatively, startNewChat could return a flag.
-            console.log(`[main.js] Session ${initialSessionId} exists. Calling loadSessionMessages...`);
             await loadSessionMessages(
                 initialSessionId,
                 domElements.historySessions, // Essential
@@ -183,6 +172,4 @@ document.addEventListener('DOMContentLoaded', async () => {
     } else {
         console.warn("[main.js] logoutButton not found.");
     }
-
-    console.log("[main.js] Initialization complete.");
 });

@@ -1,7 +1,5 @@
 // File xử lý màn hình chào mừng
 document.addEventListener('DOMContentLoaded', function() {
-    console.log("Welcome screen script initializing...");
-
     const chatContainer = document.getElementById('chatContainer');
     const chatMessages = document.getElementById('chatMessages');
     const welcomeMessageDiv = document.getElementById('welcomeMessage');
@@ -25,18 +23,15 @@ document.addEventListener('DOMContentLoaded', function() {
         return;
     }
 
-    console.log("Required elements found:", { welcomeMessageDiv, chatMessages, startChatButton });
 
     // Ensure welcome message is visible and chat messages are hidden initially
     welcomeMessageDiv.style.display = 'flex'; // Use flex as per HTML
     if (chatMessages) {
         chatMessages.classList.add('hidden');
     }
-    console.log("Welcome message displayed, chat messages hidden.");
 
     // Add event listener for the start chat button
     startChatButton.addEventListener('click', function() {
-        console.log("Start chat button clicked.");
 
         // Hide welcome message
         welcomeMessageDiv.style.display = 'none';
@@ -44,7 +39,6 @@ document.addEventListener('DOMContentLoaded', function() {
         // Show chat messages area
         if (chatMessages) {
             chatMessages.classList.remove('hidden');
-            console.log("Chat messages area shown.");
         } else {
             console.warn("Cannot show chatMessages, element not found.");
         }
@@ -53,7 +47,6 @@ document.addEventListener('DOMContentLoaded', function() {
         import('./chat/session.js')
             .then(sessionModule => {
                 if (sessionModule && typeof sessionModule.startNewChat === 'function') {
-                    console.log("Calling startNewChat...");
                     // Gather necessary DOM elements for startNewChat (ensure these exist)
                     const domElements = {
                         chatContainer: chatContainer,
@@ -82,19 +75,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 console.error("Error importing or executing session.js:", err);
             });
     });
-
-    console.log("Welcome screen setup complete.");
 });
 
 // Function to explicitly show the welcome screen (e.g., called by main.js or auth.js)
 window.showWelcomeScreen = function() {
-    console.log("Explicitly calling showWelcomeScreen()...");
     const welcomeDiv = document.getElementById('welcomeMessage');
     const messagesDiv = document.getElementById('chatMessages');
 
     if (welcomeDiv) {
         welcomeDiv.style.display = 'flex';
-        console.log("#welcomeMessage display set to flex.");
     } else {
         console.error("Cannot show welcome screen: #welcomeMessage not found.");
     }
@@ -102,7 +91,6 @@ window.showWelcomeScreen = function() {
     if (messagesDiv) {
         messagesDiv.classList.add('hidden');
         messagesDiv.innerHTML = ''; // Clear previous messages when showing welcome screen
-        console.log("#chatMessages hidden and cleared.");
     } else {
         console.warn("Cannot hide chat messages: #chatMessages not found.");
     }
