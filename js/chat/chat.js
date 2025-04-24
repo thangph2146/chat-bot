@@ -34,8 +34,31 @@ export async function handleSendMessage(domElements) {
     }
 
     if (!currentSession || !currentSessId) {
-        console.warn("[chat.js] No active session selected.");
-        showNotification("Vui lòng bắt đầu hoặc chọn một cuộc trò chuyện.", "warning");
+        console.warn("[chat.js] No active session selected. Creating a new chat session.");
+        
+        // Ẩn màn hình chào mừng (nếu đang hiển thị)
+        if (welcomeMessageDiv && chatMessagesDiv) {
+            welcomeMessageDiv.classList.add('hidden');
+            chatMessagesDiv.classList.remove('hidden');
+        }
+        
+        // Lưu tin nhắn người dùng tạm thời để gửi sau
+        const tempUserMessage = messageToSend;
+        
+        // Tạo phiên chat mới (import từ session.js)
+        const { startNewChat } = await import('./session.js');
+        await startNewChat(domElements);
+        
+        // Gọi lại hàm này sau khi phiên chat mới được tạo
+        setTimeout(() => {
+            // Khôi phục tin nhắn
+            if (messageInput) {
+                messageInput.value = tempUserMessage;
+            }
+            // Gọi lại hàm gửi tin nhắn
+            handleSendMessage(domElements);
+        }, 800); // Đợi một chút để phiên chat mới được khởi tạo hoàn tất
+        
         return;
     }
 

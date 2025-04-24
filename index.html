@@ -112,8 +112,8 @@
             <div class="w-full md:w-2/3 flex flex-col gap-4 h-full">
                 <div class="flex flex-col relative bg-white rounded-2xl shadow-container border border-primary-100 flex-grow" id="chatContainerWrapper">
                     <div class="absolute inset-0 p-4 flex flex-col overflow-y-auto scrollbar-thin scrollbar-thumb-primary-600 scrollbar-track-secondary-200" id="chatContainer" style="max-height: calc(100% - 2px);">
-                        <!-- Welcome Message -->
-                        <div class="flex flex-col items-center justify-center h-full text-center p-4 sm:p-6 animate-fade-in" id="welcomeMessage">
+                        <!-- Welcome Message - Sửa cách hiển thị để luôn xuất hiện khi cần -->
+                        <div class="flex flex-col items-center justify-center h-full w-full text-center p-4 sm:p-6 animate-fade-in" id="welcomeMessage" style="display: flex !important; position: absolute; top: 0; left: 0; right: 0; bottom: 0; z-index: 10;">
                             <div class="inline-flex p-3 rounded-full bg-primary-100 mb-4 animate-float">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 md:h-12 md:w-12 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
@@ -121,6 +121,16 @@
                             </div>
                             <h2 class="text-xl sm:text-2xl font-bold text-primary-600 mb-3 animate-fade-in">Chào mừng đến với Trợ lý AI</h2>
                             <p class="text-secondary-600 max-w-md mb-6 animate-fade-in">Trợ lý thông minh của Đại học Ngân hàng TP.HCM luôn sẵn sàng hỗ trợ bạn mọi lúc mọi nơi.</p>
+                            
+
+                            <!-- Nút bắt đầu cuộc trò chuyện -->
+                            <button id="startChatButton" class="px-6 py-3 bg-primary-500 hover:bg-primary-600 text-white font-medium rounded-lg shadow-md transition-colors duration-300 flex items-center animate-pulse">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
+                                </svg>
+                                Bắt đầu cuộc trò chuyện
+                            </button>
+                            
                             <!-- Container for dynamic bot welcome message -->
                             <div id="dynamicWelcomeContent" class="w-full max-w-lg mt-4 text-secondary-700"></div>
                         </div>
@@ -180,5 +190,8 @@
     <script type="module" src="js/chat/main.js"></script>
     <!-- Load UI interaction scripts (defer ensures it runs after DOM is parsed) -->
     <script src="js/ui-interactions.js" defer></script>
+    
+    <!-- Load welcome screen script -->
+    <script src="js/welcome-screen.js"></script>
 </body>
-</html> 
+</html>

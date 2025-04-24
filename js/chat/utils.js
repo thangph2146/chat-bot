@@ -222,7 +222,7 @@ export function renderMessageElement(msg) {
         mainContentBlock.classList.add('order-2');
         const senderNameSpan = document.createElement('span');
         senderNameSpan.className = 'text-xs font-semibold text-secondary-700 mb-1 ml-1';
-        senderNameSpan.textContent = msg.senderName || 'Assistant';
+        senderNameSpan.textContent = 'Trợ lý AI';
         mainContentBlock.appendChild(senderNameSpan);
     }
 

@@ -22,13 +22,15 @@ import {
     toggleRecording
 } from './speech.js';
 import {
-    updateHistorySidebar
+    updateHistorySidebar,
+    showWelcomeScreen,
+    hideWelcomeScreen
 } from './ui.js';
 
 // Main application entry point
 document.addEventListener('DOMContentLoaded', async () => {
 
-    // --- START: Gather DOM Elements ---
+    // --- START: Gather DOM Elements --- 
     const domElements = {
         chatContainer: document.getElementById('chatContainer'),
         messageInput: document.getElementById('messageInput'),
@@ -41,10 +43,80 @@ document.addEventListener('DOMContentLoaded', async () => {
         chatMessagesDiv: document.getElementById('chatMessages'),
         welcomeMessageDiv: document.getElementById('welcomeMessage'),
         userInfoDisplay: document.getElementById('userInfoDisplay') // Added for displayUserInfo
-        // Add any other frequently used elements here
     };
-    // --- END: Gather DOM Elements ---
-
+    
+    // Tạo màn hình chào mừng mới nếu không tìm thấy
+    if (!domElements.welcomeMessageDiv || window.getComputedStyle(domElements.welcomeMessageDiv).display === 'none') {
+        console.log("Tạo màn hình chào mừng mới vì không tìm thấy hoặc bị ẩn");
+        
+        // Xóa welcomeMessageDiv cũ nếu có
+        if (domElements.welcomeMessageDiv) {
+            domElements.welcomeMessageDiv.remove();
+        }
+        
+        // Tạo phần tử mới
+        const welcomeDiv = document.createElement('div');
+        welcomeDiv.id = 'welcomeMessage';
+        welcomeDiv.className = 'flex flex-col items-center justify-center h-full w-full text-center p-4 sm:p-6 animate-fade-in';
+        welcomeDiv.style.display = 'flex';
+        welcomeDiv.style.position = 'absolute';
+        welcomeDiv.style.top = '0';
+        welcomeDiv.style.left = '0';
+        welcomeDiv.style.right = '0';
+        welcomeDiv.style.bottom = '0';
+        welcomeDiv.style.zIndex = '100';
+        welcomeDiv.style.backgroundColor = 'white';
+        
+        welcomeDiv.innerHTML = `
+            <div class="inline-flex p-3 rounded-full bg-primary-100 mb-4 animate-float">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 md:h-12 md:w-12 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                </svg>
+            </div>
+            <h2 class="text-xl sm:text-2xl font-bold text-primary-600 mb-3 animate-fade-in">Chào mừng đến với Trợ lý AI</h2>
+            <p class="text-secondary-600 max-w-md mb-6 animate-fade-in">Trợ lý thông minh của Đại học Ngân hàng TP.HCM luôn sẵn sàng hỗ trợ bạn mọi lúc mọi nơi.</p>
+            
+            <button id="startChatButton" class="px-6 py-3 bg-primary-500 hover:bg-primary-600 text-white font-medium rounded-lg shadow-md transition-colors duration-300 flex items-center animate-pulse">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
+                </svg>
+                Bắt đầu cuộc trò chuyện
+            </button>
+            
+            <div id="dynamicWelcomeContent" class="w-full max-w-lg mt-4 text-secondary-700"></div>
+        `;
+        
+        // Thêm vào DOM trước khi chatMessagesDiv
+        if (domElements.chatContainer) {
+            if (domElements.chatMessagesDiv) {
+                domElements.chatContainer.insertBefore(welcomeDiv, domElements.chatMessagesDiv);
+            } else {
+                domElements.chatContainer.appendChild(welcomeDiv);
+            }
+            
+            // Cập nhật tham chiếu
+            domElements.welcomeMessageDiv = welcomeDiv;
+            
+            // Ẩn khu vực tin nhắn
+            if (domElements.chatMessagesDiv) {
+                domElements.chatMessagesDiv.classList.add('hidden');
+            }
+            
+            // Thêm event listener cho nút "Bắt đầu cuộc trò chuyện"
+            const newStartChatButton = welcomeDiv.querySelector('#startChatButton');
+            if (newStartChatButton) {
+                console.log("Thêm event listener cho nút 'Bắt đầu cuộc trò chuyện'");
+                newStartChatButton.addEventListener('click', () => {
+                    console.log("Nút 'Bắt đầu cuộc trò chuyện' được nhấn");
+                    hideWelcomeScreen(domElements.welcomeMessageDiv, domElements.chatMessagesDiv);
+                    startNewChat(domElements);
+                });
+            } else {
+                console.error("Không tìm thấy nút 'Bắt đầu cuộc trò chuyện' trong màn hình chào mừng mới");
+            }
+        }
+    }
+    
     // 1. Auth Check (Crucial for protecting the page)
     const isAuthenticated = checkAuthentication(); // From auth.js
 
@@ -73,47 +145,69 @@ document.addEventListener('DOMContentLoaded', async () => {
         const sessions = getAllSessions();
         const initialSessionId = getCurrentSessionId();
 
-        // LuÃ´n cáº­p nháº­t sidebar trÆ°á»›c
-        // Pass historySessions element to updateHistorySidebar
+        // Update sidebar first
         updateHistorySidebar(
             sessions, 
             initialSessionId, 
             handleSelectSession, 
             handleDeleteRequest, 
-            domElements.historySessions, // historySessionsElement
-            domElements.chatContainer,    // chatContainerElement (ThÃªm)
-            domElements.welcomeMessageDiv,// welcomeElement (ThÃªm)
-            domElements.chatMessagesDiv   // chatMessagesElement (ThÃªm)
+            domElements.historySessions,
+            domElements.chatContainer,
+            domElements.welcomeMessageDiv,
+            domElements.chatMessagesDiv
         );
 
         if (initialSessionId) {
-            // Náº¿u cÃ³ session ban Ä‘áº§u, táº£i tin nháº¯n cho nÃ³
-            // Pass ALL required elements to loadSessionMessages
+            // If there's an initial session, load its messages
+            console.log("[main.js] Initial session found, loading messages...");
             await loadSessionMessages(
                 initialSessionId,
-                domElements.historySessions,    // <<< ThÃªm historySessions
-                domElements.chatContainer,      // <<< ÄÃ£ cÃ³
-                domElements.welcomeMessageDiv,  // <<< ThÃªm welcomeMessageDiv
-                domElements.chatMessagesDiv     // <<< ThÃªm chatMessagesDiv
+                domElements.historySessions,
+                domElements.chatContainer,
+                domElements.welcomeMessageDiv,
+                domElements.chatMessagesDiv
             );
         } else {
-            // Náº¿u khÃ´ng cÃ³ session nÃ o (loadChatSessions Ä‘Ã£ gá»i startNewChat)
-             // startNewChat will need to receive elements too if it calls loadSessionUI
-             // Need to trace how showWelcomeMessage is ultimately called and ensure elements are passed down
+            // If there's no session, show the welcome screen
+            console.log("[main.js] No initial session found, showing welcome screen...");
+            
+            // Make sure the chat messages container is hidden
+            domElements.chatMessagesDiv.classList.add('hidden');
+            
+            // Make sure welcome message is visible
+            domElements.welcomeMessageDiv.classList.remove('hidden');
+            
+            // Call the function to show welcome screen properly
+            showWelcomeScreen(
+                () => startNewChat(domElements), 
+                domElements.welcomeMessageDiv,
+                domElements.chatContainer,
+                domElements.chatMessagesDiv
+            );
         }
     } else {
         console.error('[main.js] Failed to load initial chat sessions. Check logs from session.js.');
-        // Update sidebar to show error state if not already done by session.js
+        // Show error message if needed
         if (domElements.historySessions && !domElements.historySessions.querySelector('.text-red-500')) {
-             domElements.historySessions.innerHTML = '<p class="text-center text-red-500 text-sm p-4">Lá»—i táº£i lá»‹ch sá»­.</p>';
+            domElements.historySessions.innerHTML = '<p class="text-center text-red-500 text-sm p-4">Lỗi tải lịch sử.</p>';
         }
-        // Optionally show an error message in the chat area if needed
         if (domElements.chatContainer) {
-            domElements.chatContainer.innerHTML = '<p class="text-center text-red-500 text-sm p-4">KhÃ´ng thá»ƒ táº£i dá»¯ liá»‡u. Vui lÃ²ng thá»­ láº¡i.</p>';
+            domElements.chatContainer.innerHTML = '<p class="text-center text-red-500 text-sm p-4">Không thể tải dữ liệu. Vui lòng thử lại.</p>';
         }
     }
 
     // 6. Attach Event Listeners (Now that initial state is potentially set)
+    
+    // Thực hiện hiển thị màn hình chào mừng nếu không có session nào
+    if (!getCurrentSessionId()) {
+        showWelcomeScreen(
+            () => startNewChat(domElements), // hàm callback khi nút "Bắt đầu cuộc trò chuyện" được bấm
+            domElements.welcomeMessageDiv,
+            domElements.chatContainer,
+            domElements.chatMessagesDiv
+        );
+    }
+
     // Send message listeners
     if (domElements.sendButton) {
         // Pass necessary elements to handleSendMessage

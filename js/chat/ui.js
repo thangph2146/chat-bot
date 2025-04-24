@@ -329,6 +329,117 @@ export function loadSessionUI(session, showWelcomeFn, domElements) {
 }
 
 /**
+ * Hiển thị màn hình chào mừng và cấu hình nút bắt đầu cuộc trò chuyện.
+ * @param {Function} onStartChat - Hàm callback được gọi khi nút "Bắt đầu cuộc trò chuyện" được nhấn.
+ * @param {HTMLElement} welcomeElement - Phần tử DOM chứa màn hình chào mừng.
+ * @param {HTMLElement} chatContainer - Phần tử DOM chứa khu vực chat (sẽ bị ẩn).
+ * @param {HTMLElement} chatMessagesElement - Phần tử DOM chứa tin nhắn chat.
+ */
+export function showWelcomeScreen(onStartChat, welcomeElement, chatContainer, chatMessagesElement) {
+    console.log("[ui.js] Showing welcome screen");
+    if (!welcomeElement || !chatContainer || !chatMessagesElement) {
+        console.error("[ui.js] Missing required elements for showWelcomeScreen:", { 
+            welcomeElement: !!welcomeElement,
+            chatContainer: !!chatContainer,
+            chatMessagesElement: !!chatMessagesElement
+        });
+        return;
+    }
+    
+    // Đảm bảo hiển thị màn hình chào mừng
+    welcomeElement.style.display = 'flex';
+    welcomeElement.classList.remove('hidden');
+    
+    // Ẩn khu vực chat
+    chatMessagesElement.classList.add('hidden');
+    chatContainer.innerHTML = ''; 
+    
+    // Cấu hình các phần tử cha để hiển thị đúng
+    const chatAreaWrapper = chatContainer.parentElement;
+    if (chatAreaWrapper) {
+        chatAreaWrapper.style.display = 'flex';
+        chatAreaWrapper.style.flexDirection = 'column';
+        chatAreaWrapper.style.alignItems = 'center';
+        chatAreaWrapper.style.justifyContent = 'center';
+    }
+    
+    // Nếu welcomeElement bị ẩn trong CSS, hiển thị nó
+    console.log("[ui.js] Welcome element display style:", window.getComputedStyle(welcomeElement).display);
+    if (window.getComputedStyle(welcomeElement).display === 'none') {
+        console.log("[ui.js] Forcing welcome element to display flex");
+        welcomeElement.style.display = 'flex';
+    }
+    
+    // Đảm bảo nút "Bắt đầu cuộc trò chuyện" hiển thị đúng cách
+    // Tìm nút trong phần tử welcomeElement thay vì toàn bộ DOM
+    let startChatButton = welcomeElement.querySelector('#startChatButton');
+    
+    if (!startChatButton) {
+        // Nếu không tìm thấy nút, thử tìm bằng cách sử dụng DOM chung
+        startChatButton = document.getElementById('startChatButton');
+        console.log("[ui.js] Looking for button in entire DOM:", !!startChatButton);
+    }
+    
+    if (startChatButton) {
+        console.log("[ui.js] Start chat button found, configuring it");
+        // Đảm bảo nút hiển thị
+        startChatButton.style.display = 'flex';
+        startChatButton.classList.add('animate-pulse');
+        
+        // Xóa event listeners cũ (nếu có)
+        const newButton = startChatButton.cloneNode(true);
+        if (startChatButton.parentNode) {
+            startChatButton.parentNode.replaceChild(newButton, startChatButton);
+        }
+        
+        // Thêm event listener mới
+        newButton.addEventListener('click', (e) => {
+            e.preventDefault();
+            console.log("[ui.js] Start chat button clicked");
+            if (typeof onStartChat === 'function') {
+                onStartChat();
+            }
+        });
+    } else {
+        // Nếu không tìm thấy nút, tạo nút mới
+        console.warn("[ui.js] Start chat button not found, creating a new one");
+        
+        const newButton = document.createElement('button');
+        newButton.id = 'startChatButton';
+        newButton.className = 'px-6 py-3 bg-primary-500 hover:bg-primary-600 text-white font-medium rounded-lg shadow-md transition-colors duration-300 flex items-center animate-pulse';
+        newButton.innerHTML = `
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
+            </svg>
+            Bắt đầu cuộc trò chuyện
+        `;
+        
+        newButton.addEventListener('click', (e) => {
+            e.preventDefault();
+            console.log("[ui.js] Start chat button clicked (newly created)");
+            if (typeof onStartChat === 'function') {
+                onStartChat();
+            }
+        });
+        
+        // Thêm nút vào welcome message
+        welcomeElement.appendChild(newButton);
+    }
+}
+
+/**
+ * Ẩn màn hình chào mừng và hiển thị khu vực chat.
+ * @param {HTMLElement} welcomeElement - Phần tử DOM chứa màn hình chào mừng.
+ * @param {HTMLElement} chatMessagesElement - Phần tử DOM chứa tin nhắn chat.
+ */
+export function hideWelcomeScreen(welcomeElement, chatMessagesElement) {
+    if (!welcomeElement || !chatMessagesElement) return;
+    
+    welcomeElement.classList.add('hidden');
+    chatMessagesElement.classList.remove('hidden');
+}
+
+/**
  * Hiển thị dialog xác nhận xóa một session cụ thể.
  * @param {string} sessionTitle - Tiêu đề của session để hiển thị trong dialog.
  * @param {Function} onConfirm - Callback sẽ được gọi nếu người dùng xác nhận.
