@@ -19,6 +19,17 @@ export async function handleSendMessage(domElements) {
     const messageToSend = messageInput.value.trim();
     if (!messageToSend) return;
 
+    // --- Thêm logic ẩn welcome message nếu nó đang hiển thị ---
+    if (welcomeMessageDiv.style.display !== 'none' && window.getComputedStyle(welcomeMessageDiv).display !== 'none') {
+        console.log('[chat.js] Welcome message is visible. Hiding it and showing chat messages.');
+        welcomeMessageDiv.style.display = 'none'; // Hide welcome
+        chatMessagesDiv.classList.remove('hidden'); // Show chat area
+        // Đảm bảo chat area trống trước khi thêm tin nhắn đầu tiên
+        // (có thể không cần nếu loadSessionMessages/startNewChat đã xử lý)
+        // chatMessagesDiv.innerHTML = '';
+    }
+    // ---------------------------------------------------------
+
     // 1. Get necessary info
     const userInfo = getUserInfo();
     const token = userInfo?.data?.token;
