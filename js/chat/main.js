@@ -21,9 +21,18 @@ import {
 import {
     updateHistorySidebar,
 } from './ui.js';
+import { loadConfig } from './config.js';
 
 // Main application entry point
 document.addEventListener('DOMContentLoaded', async () => {
+    // Tải cấu hình từ server trước khi tiếp tục
+    try {
+        await loadConfig();
+        console.log('Đã tải cấu hình từ server thành công');
+    } catch (error) {
+        console.error('Lỗi khi tải cấu hình từ server:', error);
+        // Tiếp tục với cấu hình mặc định
+    }
 
     // --- START: Gather DOM Elements --- 
     const domElements = {

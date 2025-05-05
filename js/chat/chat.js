@@ -33,7 +33,6 @@ export async function handleSendMessage(domElements) {
     // 1. Get necessary info
     const userInfo = getUserInfo();
     const token = userInfo?.data?.token;
-    const difyApiKey = DIFY_API_KEY;
     const userId = userInfo?.data?.userId;
     const currentSession = getCurrentSession();
     const currentSessId = getCurrentSessionId();
@@ -109,7 +108,8 @@ export async function handleSendMessage(domElements) {
     const aiPlaceholderElement = addMessageToChat(null, chatContainer, false, false, null, null, true);
     if (chatContainer) chatContainer.scrollTop = chatContainer.scrollHeight;
 
-    const difyApiUrl = DIFY_CHAT_API_ENDPOINT;
+    // Sử dụng proxy API thay vì gọi trực tiếp đến Dify API
+    const difyApiUrl = DIFY_CHAT_API_ENDPOINT; // Endpoint mới (/api/dify/chat) từ server Node.js
     const difyRequestBody = {
         inputs: {},
         query: messageToSend,
@@ -119,10 +119,11 @@ export async function handleSendMessage(domElements) {
     };
 
     try {
+        // Không cần gửi DIFY_API_KEY vì nó đã được xử lý bởi server
         const result = await handleSseStream(
             difyApiUrl,
             difyRequestBody,
-            difyApiKey,
+            token, // Sử dụng token người dùng cho API của server, DIFY_API_KEY sẽ được xử lý phía server
             aiPlaceholderElement,
             chatContainer, // Pass chatContainer to handleSseStream
             (result) => {
@@ -244,7 +245,6 @@ export async function showWelcomeMessage(domElements) {
 
     const userInfo = getUserInfo();
     const token = userInfo?.data?.token;
-    const difyApiKey = DIFY_API_KEY;
     const userId = userInfo?.data?.userId;
     const currentSessId = getCurrentSessionId();
 
@@ -279,7 +279,7 @@ export async function showWelcomeMessage(domElements) {
         await handleSseStream(
             difyApiUrl,
             requestBody,
-            difyApiKey,
+            token,
             aiPlaceholderElement,
             chatContainer, // Pass chatContainer
             (result) => {

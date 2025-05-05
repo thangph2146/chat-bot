@@ -1,18 +1,46 @@
-﻿// Cấu hình API (Chuẩn hóa)
-export const API_BASE_URL = 'https://chatbotapi.hub.edu.vn/api'; // URL cơ sở chính
-export const AUTH_LOGIN_ENDPOINT = `${API_BASE_URL}/Users/login`; // Endpoint đăng nhập
-export const AUTH_REGISTER_ENDPOINT = `${API_BASE_URL}/Users/register`; // Endpoint đăng ký
-export const AUTH_GOOGLE_LOGIN_ENDPOINT = `${API_BASE_URL}/Users/google-login`; // Endpoint Google Login (Cũ - Gửi idToken)
-export const AUTH_GOOGLE_LOGIN_CUSTOM_ENDPOINT = `${API_BASE_URL}/Users/google-login`; // Endpoint Google Login (Mới - Gửi googleID, email)
-export const AUTH_GOOGLE_VERIFY_ENDPOINT = `${API_BASE_URL}/auth/google/verify`; // Endpoint Backend để xác thực idToken Google
-export const CHAT_MESSAGE_API_ENDPOINT = `${API_BASE_URL}/ChatMessages`;
-export const SESSIONS_API_ENDPOINT = `${API_BASE_URL}/ChatSessions`; // Endpoint để tạo phiên chat mới
-export const SAVE_MESSAGE_ENDPOINT = `${API_BASE_URL}/ChatMessages`; // Endpoint để tạo tin nhắn mới
+﻿// Đường dẫn API cơ sở cho các endpoint API, có thể được load động từ server
+export let API_BASE_URL = '/api/backend';
+export let AUTH_LOGIN_ENDPOINT = `${API_BASE_URL}/Users/login`;
+export let AUTH_REGISTER_ENDPOINT = `${API_BASE_URL}/Users/register`;
+export let AUTH_GOOGLE_LOGIN_ENDPOINT = `${API_BASE_URL}/Users/google-login`;
+export let AUTH_GOOGLE_LOGIN_CUSTOM_ENDPOINT = `${API_BASE_URL}/Users/google-login`;
+export let AUTH_GOOGLE_VERIFY_ENDPOINT = `${API_BASE_URL}/auth/google/verify`;
+export let CHAT_MESSAGE_API_ENDPOINT = `${API_BASE_URL}/ChatMessages`;
+export let SESSIONS_API_ENDPOINT = `${API_BASE_URL}/ChatSessions`;
+export let SAVE_MESSAGE_ENDPOINT = `${API_BASE_URL}/ChatMessages`;
 
 // Cấu hình Google Client ID
-export const GOOGLE_CLIENT_ID = '197433305936-sffe02eu5jecf94m1oh1rn6igrosv6f3.apps.googleusercontent.com';
+export let GOOGLE_CLIENT_ID = '197433305936-sffe02eu5jecf94m1oh1rn6igrosv6f3.apps.googleusercontent.com';
 
-// Cấu hình cho Dify (Nếu bạn sử dụng API Dify trực tiếp thay vì embed)
-export const DIFY_API_BASE_URL = 'https://trolyai.hub.edu.vn';
-export const DIFY_CHAT_API_ENDPOINT = `${DIFY_API_BASE_URL}/v1/chat-messages`; // Example endpoint
-export const DIFY_API_KEY = 'app-kyJ4IsXr0BvdaSuYBpdPISXH'; // Example, store securely
+// Cấu hình cho Dify (Sẽ được load từ server để bảo mật DIFY_API_KEY)
+export let DIFY_API_BASE_URL = 'https://trolyai.hub.edu.vn';
+export let DIFY_CHAT_API_ENDPOINT = '/api/dify/chat'; // Điểm cuối proxy qua server Node.js
+export let DIFY_API_KEY = ''; // Không còn lưu trữ ở client
+
+// Hàm để tải cấu hình từ server
+export async function loadConfig() {
+    try {
+        const response = await fetch('/api/config');
+        if (!response.ok) {
+            throw new Error('Không thể tải cấu hình');
+        }
+        const config = await response.json();
+        
+        // Chỉ cập nhật DIFY_API_BASE_URL và GOOGLE_CLIENT_ID, giữ nguyên đường dẫn proxy cho API_BASE_URL        
+        if (config.DIFY_API_BASE_URL) {
+            DIFY_API_BASE_URL = config.DIFY_API_BASE_URL;
+        }
+        
+        if (config.DIFY_CHAT_API_ENDPOINT) {
+            DIFY_CHAT_API_ENDPOINT = config.DIFY_CHAT_API_ENDPOINT;
+        }
+        
+        if (config.GOOGLE_CLIENT_ID) {
+            GOOGLE_CLIENT_ID = config.GOOGLE_CLIENT_ID;
+        }
+        
+        console.log('Đã tải cấu hình thành công');
+    } catch (error) {
+        console.error('Lỗi khi tải cấu hình:', error);
+    }
+}
