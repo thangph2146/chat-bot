@@ -59,12 +59,33 @@ export async function fetchWithAuth(url, options = {}, expectJson = true) {
 
         // Các lỗi HTTP khác
         if (!response.ok) {
-            let errorBody = '';
-            try {
-                errorBody = await response.text(); // Lấy text lỗi để dễ debug
-            } catch (e) { /* ignore read error */ }
-            console.error(`[api.js] fetchWithAuth: HTTP error ${response.status} for ${url}. Body:`, errorBody);
-            throw new Error(`HTTP error! status: ${response.status}, message: ${errorBody || response.statusText}`);
+            const errorData = await response.json();
+            const messageContainer = document.createElement('div');
+            messageContainer.className = 'error-message p-3 rounded-lg bg-red-50 border border-red-200';
+            
+            messageContainer.innerHTML = `
+              <div class="flex items-center">
+                <svg class="w-5 h-5 text-red-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zm-1 9a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"></path>
+                </svg>
+                <p class="text-red-800">${errorData.message || 'Đã xảy ra lỗi. Vui lòng thử lại sau.'}</p>
+              </div>
+              <button class="retry-button mt-2 px-3 py-1 bg-primary-100 hover:bg-primary-200 text-primary-700 rounded-md">
+                Thử lại
+              </button>
+            `;
+            
+            targetContentElement.innerHTML = '';
+            targetContentElement.appendChild(messageContainer);
+            
+            // Thêm sự kiện click cho nút "Thử lại"
+            const retryButton = messageContainer.querySelector('.retry-button');
+            if (retryButton) {
+              retryButton.addEventListener('click', () => {
+                // Gọi lại hàm xử lý chat
+                handleUserMessage(lastUserMessage);
+              });
+            }
         }
 
         // Xử lý phản hồi thành công
@@ -234,4 +255,4 @@ export async function handleSseStream(apiUrl, requestBody, token, targetContentE
 
 // TODO: Add other API call functions here (e.g., fetchSessions, createSession, deleteSession)
 // Example:
-// export async function fetchChatSessions(apiUrl, token) { ... } 
+// export async function fetchChatSessions(apiUrl, token) { ... }

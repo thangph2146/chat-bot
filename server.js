@@ -107,7 +107,7 @@ app.post('/api/dify/chat', async (req, res) => {
     const difyApiUrl = `${difyApiBaseUrl}/v1/chat-messages`;
     const difyApiKey = getDifyApiKey();
     
-    console.log('Sending request to Dify API with key:', difyApiKey);
+    console.log('Sending request to Dify API with key:', difyApiKey ? `${difyApiKey.substring(0, 8)}...` : 'không có');
     
     if (!difyApiKey) {
       return res.status(500).json({ error: 'DIFY_API_KEY chưa được cấu hình' });
@@ -125,8 +125,47 @@ app.post('/api/dify/chat', async (req, res) => {
       // Thêm tùy chọn bỏ qua kiểm tra SSL
       agent: new (await import('node:https')).Agent({
         rejectUnauthorized: false
-      })
+      }),
+      // Add timeout to prevent hanging requests
+      timeout: 30000 // 30 seconds timeout
     });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`Dify API error: ${response.status} - ${errorText}`);
+      
+      let userMessage = '';
+      switch(response.status) {
+        case 400:
+          userMessage = 'Yêu cầu không hợp lệ. Vui lòng thử lại với nội dung khác.';
+          break;
+        case 401:
+          userMessage = 'Phiên làm việc của bạn đã hết hạn. Vui lòng tải lại trang để tiếp tục.';
+          break;
+        case 403:
+          userMessage = 'Bạn không có quyền truy cập chức năng này.';
+          break;
+        case 404:
+          userMessage = 'Không thể tìm thấy dịch vụ AI. Vui lòng thử lại sau.';
+          break;
+        case 429:
+          userMessage = 'Bạn đã gửi quá nhiều yêu cầu. Vui lòng đợi một lát và thử lại.';
+          break;
+        case 500:
+        case 502:
+        case 503:
+        case 504:
+          userMessage = 'Hệ thống AI tạm thời không phản hồi. Vui lòng thử lại sau ít phút.';
+          break;
+        default:
+          userMessage = 'Đã xảy ra lỗi khi xử lý yêu cầu của bạn. Vui lòng thử lại sau.';
+      }
+      
+      return res.status(response.status).json({ 
+        error: `Lỗi API Dify: ${response.status}`, 
+        message: userMessage
+      });
+    }
 
     // Chuyển response từ Dify API về client
     res.set({
@@ -139,7 +178,29 @@ app.post('/api/dify/chat', async (req, res) => {
     response.body.pipe(res);
   } catch (error) {
     console.error('Lỗi khi gọi Dify API:', error);
-    res.status(500).json({ error: `Lỗi khi gọi Dify API: ${error.message}` });
+    
+    // Send a more specific error message based on the error type
+    let userMessage = 'Vui lòng thử lại sau ít phút.';
+    let statusCode = 500;
+    
+    if (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND') {
+      statusCode = 503;
+      userMessage = 'Không thể kết nối đến trợ lý AI. Vui lòng kiểm tra kết nối mạng và thử lại sau.';
+    } else if (error.code === 'ETIMEDOUT') {
+      statusCode = 504;
+      userMessage = 'Quá thời gian kết nối đến trợ lý AI. Vui lòng thử lại câu hỏi ngắn gọn hơn hoặc thử lại sau.';
+    } else if (error.type === 'system' && error.code === 'ERR_INVALID_URL') {
+      statusCode = 500;
+      userMessage = 'Cấu hình hệ thống không hợp lệ. Vui lòng liên hệ quản trị viên.';
+    } else if (error.name === 'AbortError') {
+      statusCode = 408;
+      userMessage = 'Yêu cầu đã bị hủy do mất quá nhiều thời gian. Vui lòng thử lại với câu hỏi ngắn gọn hơn.';
+    }
+    
+    return res.status(statusCode).json({ 
+      error: `Lỗi khi gọi Dify API: ${error.message}`, 
+      message: userMessage
+    });
   }
 });
 
@@ -228,4 +289,4 @@ app.listen(PORT, () => {
   console.log(`DIFY_API_KEY: ${difyApiKey ? difyApiKey.substring(0, 8) + '...' : 'không có'}`);
   console.log(`API_BASE_URL: ${getApiBaseUrl()}`);
   console.log(`DIFY_API_BASE_URL: ${getDifyApiBaseUrl()}`);
-}); 
+});
