@@ -140,22 +140,22 @@ app.post('/api/dify/chat', async (req, res) => {
           userMessage = 'Yêu cầu không hợp lệ. Vui lòng thử lại với nội dung khác.';
           break;
         case 401:
-          userMessage = 'Phiên làm việc của bạn đã hết hạn. Vui lòng tải lại trang để tiếp tục.';
+          userMessage = 'Phiên làm việc của bạn đã hết hạn. Vui lòng tải lại trang để tiếp tục trò chuyện.';
           break;
         case 403:
           userMessage = 'Bạn không có quyền truy cập chức năng này.';
           break;
         case 404:
-          userMessage = 'Không thể tìm thấy dịch vụ AI. Vui lòng thử lại sau.';
+          userMessage = 'Không thể kết nối đến trợ lý AI. Vui lòng thử lại sau.';
           break;
         case 429:
-          userMessage = 'Bạn đã gửi quá nhiều yêu cầu. Vui lòng đợi một lát và thử lại.';
+          userMessage = 'Xin lỗi! Tôi đang nhận quá nhiều yêu cầu. Hãy đợi một lát và thử lại nhé.';
           break;
         case 500:
         case 502:
         case 503:
         case 504:
-          userMessage = 'Hệ thống AI tạm thời không phản hồi. Vui lòng thử lại sau ít phút.';
+          userMessage = 'Hệ thống AI tạm thời không phản hồi. Tôi sẽ sớm hoạt động trở lại!';
           break;
         default:
           userMessage = 'Đã xảy ra lỗi khi xử lý yêu cầu của bạn. Vui lòng thử lại sau.';
@@ -185,16 +185,16 @@ app.post('/api/dify/chat', async (req, res) => {
     
     if (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND') {
       statusCode = 503;
-      userMessage = 'Không thể kết nối đến trợ lý AI. Vui lòng kiểm tra kết nối mạng và thử lại sau.';
+      userMessage = 'Kết nối mạng có vấn đề. Vui lòng kiểm tra kết nối internet và thử lại.';
     } else if (error.code === 'ETIMEDOUT') {
       statusCode = 504;
-      userMessage = 'Quá thời gian kết nối đến trợ lý AI. Vui lòng thử lại câu hỏi ngắn gọn hơn hoặc thử lại sau.';
+      userMessage = 'Câu hỏi của bạn quá phức tạp, tôi cần thêm thời gian. Hãy thử câu ngắn gọn hơn hoặc chia nhỏ vấn đề.';
     } else if (error.type === 'system' && error.code === 'ERR_INVALID_URL') {
       statusCode = 500;
-      userMessage = 'Cấu hình hệ thống không hợp lệ. Vui lòng liên hệ quản trị viên.';
+      userMessage = 'Có lỗi xảy ra với hệ thống. Vui lòng thử lại sau hoặc liên hệ hỗ trợ nếu vấn đề vẫn tiếp diễn.';
     } else if (error.name === 'AbortError') {
       statusCode = 408;
-      userMessage = 'Yêu cầu đã bị hủy do mất quá nhiều thời gian. Vui lòng thử lại với câu hỏi ngắn gọn hơn.';
+      userMessage = 'Câu hỏi của bạn quá phức tạp, tôi cần thêm thời gian. Hãy thử câu ngắn gọn hơn hoặc chia nhỏ vấn đề.';
     }
     
     return res.status(statusCode).json({ 

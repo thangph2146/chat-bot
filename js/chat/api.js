@@ -241,7 +241,61 @@ export async function handleSseStream(apiUrl, requestBody, token, targetContentE
             console.error('Error in handleSseStream:', error);
             if (targetContentElement) {
                 const errorWrapper = targetContentElement.closest('.message-content') || targetContentElement;
-                errorWrapper.innerHTML = `<div class="markdown-content text-red-600">Xin lỗi, đã xảy ra lỗi: ${error.message}</div>`;
+                
+                // Xác định loại lỗi để hiển thị thông báo phù hợp
+                let errorMessage = 'Đã xảy ra lỗi khi xử lý yêu cầu của bạn.';
+                let retryMessage = 'Thử lại';
+                
+                if (error.message.includes('500') || error.message.includes('502') || 
+                    error.message.includes('503') || error.message.includes('504')) {
+                    errorMessage = 'Hệ thống AI tạm thời không phản hồi. Tôi sẽ sớm hoạt động trở lại!';
+                    retryMessage = 'Thử lại câu hỏi';
+                } else if (error.message.includes('429')) {
+                    errorMessage = 'Xin lỗi! Tôi đang nhận quá nhiều yêu cầu. Hãy đợi một lát và thử lại nhé.';
+                    retryMessage = 'Thử lại sau';
+                } else if (error.message.includes('401')) {
+                    errorMessage = 'Phiên làm việc của bạn đã hết hạn. Vui lòng tải lại trang để tiếp tục trò chuyện.';
+                    retryMessage = 'Tải lại trang';
+                } else if (error.message.includes('404')) {
+                    errorMessage = 'Không thể kết nối đến trợ lý AI. Vui lòng thử lại sau.';
+                    retryMessage = 'Thử lại';
+                } else if (error.message.includes('400')) {
+                    errorMessage = 'Yêu cầu không hợp lệ. Vui lòng thử lại với nội dung khác.';
+                    retryMessage = 'Thử lại với nội dung khác';
+                } else if (error.message.includes('403')) {
+                    errorMessage = 'Bạn không có quyền truy cập chức năng này.';
+                    retryMessage = 'Thử lại';
+                } else if (error.message.includes('timeout') || error.message.includes('ETIMEDOUT')) {
+                    errorMessage = 'Câu hỏi của bạn quá phức tạp, tôi cần thêm thời gian. Hãy thử câu ngắn gọn hơn hoặc chia nhỏ vấn đề.';
+                    retryMessage = 'Thử câu ngắn hơn';
+                } else if (error.message.includes('network') || error.message.includes('ECONNREFUSED') || error.message.includes('ENOTFOUND')) {
+                    errorMessage = 'Kết nối mạng có vấn đề. Vui lòng kiểm tra kết nối internet và thử lại.';
+                    retryMessage = 'Thử lại khi có mạng';
+                }
+
+                errorWrapper.innerHTML = `
+                    <div class="markdown-content">
+                        <div class="p-3 rounded-lg bg-red-50 border border-red-200">
+                            <div class="flex items-center mb-2">
+                                <svg class="w-5 h-5 text-red-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zm-1 9a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"></path>
+                                </svg>
+                                <p class="text-red-800 font-medium">${errorMessage}</p>
+                            </div>
+                            <div class="text-sm text-gray-600 mb-3">
+                                Tôi rất tiếc vì sự bất tiện này. Có thể bạn muốn:
+                            </div>
+                            <div class="flex flex-wrap gap-2">
+                                <button class="retry-button px-3 py-1 bg-primary-100 hover:bg-primary-200 text-primary-700 rounded-md flex items-center transition-colors">
+                                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.403 4.207A2 2 0 0116.618 24H7.382a2 2 0 01-1.979-2.793L4 17h5m6-13H9l1.403-4.207A2 2 0 0111.382 0h7.236a2 2 0 011.979 2.793L18 4z"></path>
+                                    </svg>
+                                    ${retryMessage}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
                 if (ellipsis) ellipsis.remove();
             }
 
