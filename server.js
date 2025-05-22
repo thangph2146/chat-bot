@@ -3,7 +3,7 @@ const express = require('express');
 const path = require('path');
 const fs = require('fs');
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3000; // Changed port to 3000 or use environment variable
 
 // Debug: Kiểm tra file .env có tồn tại không và nội dung của nó
 try {
@@ -25,20 +25,13 @@ console.log('API_BASE_URL:', process.env.API_BASE_URL);
 console.log('DIFY_API_BASE_URL:', process.env.DIFY_API_BASE_URL);
 
 // Đặt giá trị mặc định cho các biến nếu chúng không được đọc từ .env
-if (!process.env.DIFY_API_KEY) {
-  process.env.DIFY_API_KEY = 'app-kyJ4IsXr0BvdaSuYBpdPISXH';
-  console.log('Đã đặt DIFY_API_KEY mặc định:', process.env.DIFY_API_KEY);
-}
+const difyApiKey = process.env.DIFY_API_KEY || 'app-kyJ4IsXr0BvdaSuYBpdPISXH';
+const apiBaseUrl = process.env.API_BASE_URL || 'https://chatbotapi.hub.edu.vn/api';
+const difyApiBaseUrl = process.env.DIFY_API_BASE_URL || 'https://trolyai.hub.edu.vn';
 
-if (!process.env.API_BASE_URL) {
-  process.env.API_BASE_URL = 'https://chatbotapi.hub.edu.vn/api';
-  console.log('Đã đặt API_BASE_URL mặc định:', process.env.API_BASE_URL);
-}
-
-if (!process.env.DIFY_API_BASE_URL) {
-  process.env.DIFY_API_BASE_URL = 'https://trolyai.hub.edu.vn';
-  console.log('Đã đặt DIFY_API_BASE_URL mặc định:', process.env.DIFY_API_BASE_URL);
-}
+console.log('Đã đặt DIFY_API_KEY mặc định:', difyApiKey);
+console.log('Đã đặt API_BASE_URL mặc định:', apiBaseUrl);
+console.log('Đã đặt DIFY_API_BASE_URL mặc định:', difyApiBaseUrl);
 
 // Import node-fetch
 const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));

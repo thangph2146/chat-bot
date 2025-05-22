@@ -10,6 +10,7 @@
 .markdown-content ul, .markdown-content ol {
     margin-left: 1rem;
     margin-bottom: 1rem;
+    margin-top: 1rem;
 }
 .markdown-content a {
     color: #b42c1c; /* primary-600 */

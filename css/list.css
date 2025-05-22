@@ -1,0 +1,133 @@
+/* Styles for lists within chat messages */
+ul {
+    padding-left: 0;
+    margin: 1rem 1rem;
+    list-style: none;
+    font-family: system-ui, -apple-system, sans-serif;
+}
+
+ul li {
+    position: relative;
+    padding: 0.75rem 1rem 0.75rem 2.5rem;
+    margin-bottom: 0.5rem;
+    background-color: rgba(255, 255, 255, 0.5);
+    border-left: 3px solid #b42c1c;
+    border-radius: 0 8px 8px 0;
+    transition: all 0.2s ease;
+    line-height: 1.6;
+}
+
+/* Custom bullet points */
+ul li::before {
+    content: '';
+    position: absolute;
+    left: 1rem;
+    top: 1.1rem;
+    width: 8px;
+    height: 8px;
+    background-color: #b42c1c;
+    border-radius: 50%;
+}
+
+/* Hover effect */
+ul li:hover {
+    background-color: #fef3f2;
+    transform: translateX(3px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+/* Alternating style for better readability */
+ul li:nth-child(odd) {
+    background-color: rgba(249, 250, 251, 0.7);
+}
+
+ul li:nth-child(odd):hover {
+    background-color: #fef3f2;
+}
+
+/* Nested lists */
+ul ul {
+    margin: 0.5rem 0 0 0;
+}
+
+ul ul li {
+    padding-left: 2.25rem;
+    margin-bottom: 0.4rem;
+    border-left: 2px solid rgba(180, 44, 28, 0.5);
+}
+
+ul ul li::before {
+    width: 6px;
+    height: 6px;
+}
+
+/* Animation for when lists appear */
+@keyframes fadeInList {
+    from {
+        opacity: 0;
+        transform: translateY(5px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+ul {
+    animation: fadeInList 0.3s ease-out forwards;
+}
+
+ul li {
+    opacity: 0;
+    animation: fadeInList 0.3s ease-out forwards;
+}
+
+/* Staggered animation for list items */
+ul li:nth-child(1) { animation-delay: 0.05s; }
+ul li:nth-child(2) { animation-delay: 0.1s; }
+ul li:nth-child(3) { animation-delay: 0.15s; }
+ul li:nth-child(4) { animation-delay: 0.2s; }
+ul li:nth-child(5) { animation-delay: 0.25s; }
+ul li:nth-child(6) { animation-delay: 0.3s; }
+ul li:nth-child(7) { animation-delay: 0.35s; }
+
+/* Responsive styling */
+@media (max-width: 768px) {
+    ul li {
+        padding: 0.6rem 0.8rem 0.6rem 2.2rem;
+        font-size: 0.95rem;
+    }
+    
+    ul li::before {
+        left: 0.8rem;
+    }
+    
+    /* Simpler animations on mobile */
+    ul,
+    ul li {
+        animation-duration: 0.2s;
+    }
+}
+
+/* Make sure text wraps properly */
+ul li {
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+}
+
+/* Highlight important lines that contain specific keywords */
+ul li:has(strong),
+ul li:contains("Fintech"),
+ul li:contains("trí tuệ nhân tạo") {
+    background-color: rgba(254, 226, 226, 0.7); /* light primary color */
+    font-weight: 500;
+}
+
+/* Print optimization */
+@media print {
+    ul li {
+        border-left-width: 1px;
+        page-break-inside: avoid;
+        background-color: transparent;
+    }
+}
