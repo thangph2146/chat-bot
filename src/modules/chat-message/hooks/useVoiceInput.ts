@@ -79,10 +79,10 @@ export const useVoiceInput = ({
     
     // Try to get SpeechRecognition API
     const SpeechRecognitionAPI = 
-      (window as any).SpeechRecognition || 
-      (window as any).webkitSpeechRecognition ||
-      (window as any).mozSpeechRecognition ||
-      (window as any).msSpeechRecognition;
+      (window as unknown as { SpeechRecognition?: { new(): SpeechRecognition } }).SpeechRecognition || 
+      (window as unknown as { webkitSpeechRecognition?: { new(): SpeechRecognition } }).webkitSpeechRecognition ||
+      (window as unknown as { mozSpeechRecognition?: { new(): SpeechRecognition } }).mozSpeechRecognition ||
+      (window as unknown as { msSpeechRecognition?: { new(): SpeechRecognition } }).msSpeechRecognition;
     
     setIsSupported(!!SpeechRecognitionAPI);
     
