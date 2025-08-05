@@ -91,9 +91,9 @@ class RealtimeTTSService {
       utterance.voice = this.manager.options.voice;
     }
     
-    utterance.rate = this.manager.options.rate || 1.0;
-    utterance.pitch = this.manager.options.pitch || 1.0;
-    utterance.volume = this.manager.options.volume || 0.8;
+    utterance.rate = this.manager.options.rate || 1.4; // Tăng tốc độ mặc định
+    utterance.pitch = this.manager.options.pitch || 1.1; // Tăng pitch mặc định
+    utterance.volume = this.manager.options.volume || 0.9; // Tăng volume mặc định
     utterance.lang = this.manager.options.language || 'vi-VN';
 
     return utterance;
@@ -105,7 +105,11 @@ class RealtimeTTSService {
     try {
       // Stop current speech if playing
       if (this.manager.isPlaying) {
-        speechSynthesis.cancel();
+        try {
+          speechSynthesis.cancel();
+        } catch (error) {
+          console.log('ℹ️ TTS cancel - normal behavior');
+        }
       }
 
       const utterance = this.createUtterance(text);
@@ -129,10 +133,21 @@ class RealtimeTTSService {
       utterance.onerror = (error) => {
         this.manager.isPlaying = false;
         this.manager.currentUtterance = null;
-        const ttsError = new Error(`TTS Error: ${error.error}`);
-        callbacks?.onTTSError?.(ttsError);
-        callbacks?.onBotStateChange?.('idle');
-        console.error('🚨 TTS Error:', error);
+        
+        // Handle different error types gracefully
+        if (error.error === 'interrupted' || error.error === 'canceled') {
+          // These are normal interruptions, not real errors
+          console.log('ℹ️ TTS interrupted/canceled - normal behavior');
+          callbacks?.onTTSEnd?.(); // Treat as normal end
+          callbacks?.onBotStateChange?.('idle');
+        } else {
+          // Real error
+          const errorMessage = `TTS Error: ${error.error}`;
+          console.error('🚨 TTS Error:', error);
+          const ttsError = new Error(errorMessage);
+          callbacks?.onTTSError?.(ttsError);
+          callbacks?.onBotStateChange?.('idle');
+        }
       };
 
       // Add utterance to speech queue
@@ -212,7 +227,13 @@ class RealtimeTTSService {
       this.speakTimeout = null;
     }
     
-    speechSynthesis.cancel();
+    // Gracefully stop speech synthesis
+    try {
+      speechSynthesis.cancel();
+    } catch (error) {
+      console.log('ℹ️ TTS stop - normal behavior');
+    }
+    
     this.manager.isPlaying = false;
     this.manager.currentUtterance = null;
     this.manager.textBuffer = '';
@@ -220,11 +241,19 @@ class RealtimeTTSService {
   };
 
   public pause = (): void => {
-    speechSynthesis.pause();
+    try {
+      speechSynthesis.pause();
+    } catch (error) {
+      console.log('ℹ️ TTS pause - normal behavior');
+    }
   };
 
   public resume = (): void => {
-    speechSynthesis.resume();
+    try {
+      speechSynthesis.resume();
+    } catch (error) {
+      console.log('ℹ️ TTS resume - normal behavior');
+    }
   };
 
   public getStatus = () => ({

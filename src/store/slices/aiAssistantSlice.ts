@@ -11,6 +11,33 @@ export interface AIMessage {
   ttsStatus?: 'idle' | 'playing' | 'paused' | 'completed';
 }
 
+export interface AIError {
+  type: 'api' | 'tts' | 'voice' | 'network' | 'permission' | 'unknown';
+  code?: string;
+  message: string;
+  timestamp: number;
+  recoverable: boolean;
+  retryAction?: string;
+}
+
+export interface VoiceInputState {
+  isListening: boolean;
+  transcript: string;
+  confidence: number;
+  error: string | null;
+  isSupported: boolean;
+  permission: 'granted' | 'denied' | 'prompt' | 'unknown';
+}
+
+export interface TTSState {
+  isPlaying: boolean;
+  currentText: string | null;
+  queue: string[];
+  error: string | null;
+  isSupported: boolean;
+  voice: SpeechSynthesisVoice | null;
+}
+
 export interface AIAssistantState {
   // Chat state
   messages: AIMessage[];
@@ -18,7 +45,7 @@ export interface AIAssistantState {
   isLoading: boolean;
   isStreaming: boolean;
   streamingContent: string;
-  error: string | null;
+  error: AIError | null;
   
   // Conversation state
   conversationId: string | null;
@@ -28,12 +55,9 @@ export interface AIAssistantState {
   botState: 'idle' | 'listening' | 'thinking' | 'speaking' | 'greeting';
   botAnimation: 'idle' | 'wave' | 'nod' | 'speaking' | 'listening' | 'thinking';
   
-  // TTS state
+  // Consolidated TTS state
+  tts: TTSState;
   ttsEnabled: boolean;
-  isSpeaking: boolean;
-  ttsQueue: string[];
-  currentTTSText: string | null;
-  ttsVoice: string | null;
   ttsSettings: {
     rate: number;
     pitch: number;
@@ -41,17 +65,21 @@ export interface AIAssistantState {
     language: 'vi-VN' | 'en-US';
   };
   
+  // Consolidated Voice Input state
+  voice: VoiceInputState;
+  
   // UI state
   showWelcome: boolean;
   isFirstVisit: boolean;
-  micPermission: 'granted' | 'denied' | 'prompt' | 'unknown';
-  isListening: boolean;
-  transcript: string;
   
   // Settings
   autoGreeting: boolean;
   autoTTS: boolean;
   keepConversation: boolean;
+  
+  // Performance & Debug
+  lastActivity: number;
+  debugMode: boolean;
 }
 
 const initialState: AIAssistantState = {
@@ -71,30 +99,45 @@ const initialState: AIAssistantState = {
   botState: 'idle',
   botAnimation: 'idle',
   
-  // TTS state
+  // Consolidated TTS state
+  tts: {
+    isPlaying: false,
+    currentText: null,
+    queue: [],
+    error: null,
+    isSupported: typeof window !== 'undefined' && 'speechSynthesis' in window,
+    voice: null,
+  },
   ttsEnabled: true,
-  isSpeaking: false,
-  ttsQueue: [],
-  currentTTSText: null,
-  ttsVoice: null,
   ttsSettings: {
-    rate: 1.0,
-    pitch: 1.0,
-    volume: 0.8,
+    rate: 1.4, // Optimized speed
+    pitch: 1.1,
+    volume: 0.9,
     language: 'vi-VN',
+  },
+  
+  // Consolidated Voice Input state
+  voice: {
+    isListening: false,
+    transcript: '',
+    confidence: 0,
+    error: null,
+    isSupported: typeof window !== 'undefined' && ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window),
+    permission: 'unknown',
   },
   
   // UI state
   showWelcome: true,
   isFirstVisit: true,
-  micPermission: 'unknown',
-  isListening: false,
-  transcript: '',
   
   // Settings
   autoGreeting: true,
   autoTTS: true,
   keepConversation: true,
+  
+  // Performance & Debug
+  lastActivity: Date.now(),
+  debugMode: false,
 };
 
 // ==================== SLICE ====================
@@ -139,12 +182,34 @@ const aiAssistantSlice = createSlice({
       }
     },
     
-    setError: (state, action: PayloadAction<string | null>) => {
+    setError: (state, action: PayloadAction<AIError | null>) => {
       state.error = action.payload;
+      state.lastActivity = Date.now();
       if (action.payload) {
         state.botState = 'idle';
         state.botAnimation = 'idle';
       }
+    },
+    
+    // Enhanced error actions
+    setApiError: (state, action: PayloadAction<{ message: string; code?: string; recoverable?: boolean }>) => {
+      const { message, code, recoverable = true } = action.payload;
+      state.error = {
+        type: 'api',
+        code,
+        message,
+        timestamp: Date.now(),
+        recoverable,
+        retryAction: recoverable ? 'retry_api_call' : undefined,
+      };
+      state.botState = 'idle';
+      state.botAnimation = 'idle';
+      state.lastActivity = Date.now();
+    },
+    
+    clearError: (state) => {
+      state.error = null;
+      state.lastActivity = Date.now();
     },
     
     // Streaming actions
@@ -200,13 +265,31 @@ const aiAssistantSlice = createSlice({
       state.botAnimation = action.payload;
     },
     
-    // TTS actions
+    // Enhanced TTS actions using consolidated state
     setTTSEnabled: (state, action: PayloadAction<boolean>) => {
       state.ttsEnabled = action.payload;
+      state.lastActivity = Date.now();
+    },
+    
+    updateTTSState: (state, action: PayloadAction<Partial<TTSState>>) => {
+      state.tts = { ...state.tts, ...action.payload };
+      state.lastActivity = Date.now();
+      
+      // Auto-sync bot state with TTS
+      if (action.payload.isPlaying !== undefined) {
+        if (action.payload.isPlaying) {
+          state.botState = 'speaking';
+          state.botAnimation = 'speaking';
+        } else if (state.botState === 'speaking') {
+          state.botState = 'idle';
+          state.botAnimation = 'idle';
+        }
+      }
     },
     
     setIsSpeaking: (state, action: PayloadAction<boolean>) => {
-      state.isSpeaking = action.payload;
+      state.tts.isPlaying = action.payload;
+      state.lastActivity = Date.now();
       if (action.payload) {
         state.botState = 'speaking';
         state.botAnimation = 'speaking';
@@ -217,33 +300,70 @@ const aiAssistantSlice = createSlice({
     },
     
     addToTTSQueue: (state, action: PayloadAction<string>) => {
-      state.ttsQueue.push(action.payload);
+      state.tts.queue.push(action.payload);
+      state.lastActivity = Date.now();
     },
     
     removeFromTTSQueue: (state) => {
-      state.ttsQueue.shift();
+      state.tts.queue.shift();
+      state.lastActivity = Date.now();
     },
     
     clearTTSQueue: (state) => {
-      state.ttsQueue = [];
-      state.currentTTSText = null;
+      state.tts.queue = [];
+      state.tts.currentText = null;
+      state.lastActivity = Date.now();
     },
     
     setCurrentTTSText: (state, action: PayloadAction<string | null>) => {
-      state.currentTTSText = action.payload;
+      state.tts.currentText = action.payload;
+      state.lastActivity = Date.now();
     },
     
     updateTTSSettings: (state, action: PayloadAction<Partial<AIAssistantState['ttsSettings']>>) => {
       state.ttsSettings = { ...state.ttsSettings, ...action.payload };
+      state.lastActivity = Date.now();
     },
     
-    // Voice input actions
-    setMicPermission: (state, action: PayloadAction<AIAssistantState['micPermission']>) => {
-      state.micPermission = action.payload;
+    setTTSError: (state, action: PayloadAction<string | null>) => {
+      state.tts.error = action.payload;
+      if (action.payload) {
+        state.error = {
+          type: 'tts',
+          message: action.payload,
+          timestamp: Date.now(),
+          recoverable: true,
+          retryAction: 'retry_tts',
+        };
+      }
+      state.lastActivity = Date.now();
+    },
+    
+    // Enhanced Voice input actions using consolidated state
+    updateVoiceState: (state, action: PayloadAction<Partial<VoiceInputState>>) => {
+      state.voice = { ...state.voice, ...action.payload };
+      state.lastActivity = Date.now();
+      
+      // Auto-sync bot state with voice listening
+      if (action.payload.isListening !== undefined) {
+        if (action.payload.isListening) {
+          state.botState = 'listening';
+          state.botAnimation = 'listening';
+        } else if (state.botState === 'listening') {
+          state.botState = 'idle';
+          state.botAnimation = 'idle';
+        }
+      }
+    },
+    
+    setMicPermission: (state, action: PayloadAction<VoiceInputState['permission']>) => {
+      state.voice.permission = action.payload;
+      state.lastActivity = Date.now();
     },
     
     setIsListening: (state, action: PayloadAction<boolean>) => {
-      state.isListening = action.payload;
+      state.voice.isListening = action.payload;
+      state.lastActivity = Date.now();
       if (action.payload) {
         state.botState = 'listening';
         state.botAnimation = 'listening';
@@ -254,16 +374,38 @@ const aiAssistantSlice = createSlice({
     },
     
     setTranscript: (state, action: PayloadAction<string>) => {
-      state.transcript = action.payload;
+      state.voice.transcript = action.payload;
+      state.lastActivity = Date.now();
+    },
+    
+    setVoiceConfidence: (state, action: PayloadAction<number>) => {
+      state.voice.confidence = action.payload;
+      state.lastActivity = Date.now();
+    },
+    
+    setVoiceError: (state, action: PayloadAction<string | null>) => {
+      state.voice.error = action.payload;
+      if (action.payload) {
+        state.error = {
+          type: 'voice',
+          message: action.payload,
+          timestamp: Date.now(),
+          recoverable: true,
+          retryAction: 'retry_voice_input',
+        };
+      }
+      state.lastActivity = Date.now();
     },
     
     // UI actions
     setShowWelcome: (state, action: PayloadAction<boolean>) => {
       state.showWelcome = action.payload;
+      state.lastActivity = Date.now();
     },
     
     setIsFirstVisit: (state, action: PayloadAction<boolean>) => {
       state.isFirstVisit = action.payload;
+      state.lastActivity = Date.now();
     },
     
     // Settings actions
@@ -276,16 +418,48 @@ const aiAssistantSlice = createSlice({
       if (autoGreeting !== undefined) state.autoGreeting = autoGreeting;
       if (autoTTS !== undefined) state.autoTTS = autoTTS;
       if (keepConversation !== undefined) state.keepConversation = keepConversation;
+      state.lastActivity = Date.now();
     },
     
     // Conversation actions
     setConversationId: (state, action: PayloadAction<string | null>) => {
       state.conversationId = action.payload;
+      state.lastActivity = Date.now();
+    },
+    
+    // Debug actions
+    setDebugMode: (state, action: PayloadAction<boolean>) => {
+      state.debugMode = action.payload;
+      state.lastActivity = Date.now();
+    },
+    
+    updateLastActivity: (state) => {
+      state.lastActivity = Date.now();
     },
     
     // Reset actions
     resetState: () => {
-      return { ...initialState, isFirstVisit: false };
+      return { ...initialState, isFirstVisit: false, lastActivity: Date.now() };
+    },
+    
+    // Soft reset - keep important state
+    softReset: (state) => {
+      state.messages = [];
+      state.conversationId = null;
+      state.messageId = null;
+      state.error = null;
+      state.isLoading = false;
+      state.isStreaming = false;
+      state.streamingContent = '';
+      state.botState = 'idle';
+      state.botAnimation = 'idle';
+      state.tts.queue = [];
+      state.tts.currentText = null;
+      state.tts.isPlaying = false;
+      state.voice.transcript = '';
+      state.voice.confidence = 0;
+      state.voice.isListening = false;
+      state.lastActivity = Date.now();
     },
     
     // Welcome greeting
@@ -293,6 +467,7 @@ const aiAssistantSlice = createSlice({
       state.botState = 'greeting';
       state.botAnimation = 'wave';
       state.showWelcome = true;
+      state.lastActivity = Date.now();
     },
   },
 });
@@ -308,6 +483,8 @@ export const {
   // Loading states
   setLoading,
   setError,
+  setApiError,
+  clearError,
   
   // Streaming actions
   startStreaming,
@@ -318,19 +495,24 @@ export const {
   setBotState,
   setBotAnimation,
   
-  // TTS actions
+  // Enhanced TTS actions
   setTTSEnabled,
+  updateTTSState,
   setIsSpeaking,
   addToTTSQueue,
   removeFromTTSQueue,
   clearTTSQueue,
   setCurrentTTSText,
   updateTTSSettings,
+  setTTSError,
   
-  // Voice input actions
+  // Enhanced Voice input actions
+  updateVoiceState,
   setMicPermission,
   setIsListening,
   setTranscript,
+  setVoiceConfidence,
+  setVoiceError,
   
   // UI actions
   setShowWelcome,
@@ -342,8 +524,13 @@ export const {
   // Conversation actions
   setConversationId,
   
+  // Debug actions
+  setDebugMode,
+  updateLastActivity,
+  
   // Reset actions
   resetState,
+  softReset,
   showGreeting,
 } = aiAssistantSlice.actions;
 
@@ -352,7 +539,47 @@ export const selectAIAssistant = (state: { aiAssistant: AIAssistantState }) => s
 export const selectMessages = (state: { aiAssistant: AIAssistantState }) => state.aiAssistant.messages;
 export const selectIsLoading = (state: { aiAssistant: AIAssistantState }) => state.aiAssistant.isLoading;
 export const selectBotState = (state: { aiAssistant: AIAssistantState }) => state.aiAssistant.botState;
+export const selectError = (state: { aiAssistant: AIAssistantState }) => state.aiAssistant.error;
+
+// Enhanced TTS selectors
+export const selectTTS = (state: { aiAssistant: AIAssistantState }) => state.aiAssistant.tts;
 export const selectTTSEnabled = (state: { aiAssistant: AIAssistantState }) => state.aiAssistant.ttsEnabled;
-export const selectIsSpeaking = (state: { aiAssistant: AIAssistantState }) => state.aiAssistant.isSpeaking;
+export const selectIsSpeaking = (state: { aiAssistant: AIAssistantState }) => state.aiAssistant.tts.isPlaying;
+export const selectTTSQueue = (state: { aiAssistant: AIAssistantState }) => state.aiAssistant.tts.queue;
+export const selectTTSSettings = (state: { aiAssistant: AIAssistantState }) => state.aiAssistant.ttsSettings;
+
+// Enhanced Voice selectors
+export const selectVoice = (state: { aiAssistant: AIAssistantState }) => state.aiAssistant.voice;
+export const selectIsListening = (state: { aiAssistant: AIAssistantState }) => state.aiAssistant.voice.isListening;
+export const selectTranscript = (state: { aiAssistant: AIAssistantState }) => state.aiAssistant.voice.transcript;
+export const selectVoiceConfidence = (state: { aiAssistant: AIAssistantState }) => state.aiAssistant.voice.confidence;
+export const selectMicPermission = (state: { aiAssistant: AIAssistantState }) => state.aiAssistant.voice.permission;
+
+// Performance selectors
+export const selectLastActivity = (state: { aiAssistant: AIAssistantState }) => state.aiAssistant.lastActivity;
+export const selectDebugMode = (state: { aiAssistant: AIAssistantState }) => state.aiAssistant.debugMode;
+
+// Convenience selectors
+export const selectIsActive = (state: { aiAssistant: AIAssistantState }) => {
+  const assistant = state.aiAssistant;
+  return assistant.voice.isListening || assistant.tts.isPlaying || assistant.isLoading || assistant.isStreaming;
+};
+
+export const selectCanInteract = (state: { aiAssistant: AIAssistantState }) => {
+  const assistant = state.aiAssistant;
+  return !assistant.isLoading && !assistant.isStreaming && assistant.voice.isSupported;
+};
+
+export const selectSystemStatus = (state: { aiAssistant: AIAssistantState }) => {
+  const assistant = state.aiAssistant;
+  return {
+    ttsSupported: assistant.tts.isSupported,
+    voiceSupported: assistant.voice.isSupported,
+    hasPermission: assistant.voice.permission === 'granted',
+    isActive: assistant.voice.isListening || assistant.tts.isPlaying || assistant.isLoading,
+    lastActivity: assistant.lastActivity,
+    debugMode: assistant.debugMode,
+  };
+};
 
 export default aiAssistantSlice.reducer;

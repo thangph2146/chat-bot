@@ -137,9 +137,9 @@ export const defaultAIAssistantConfig: AIAssistantConfig = {
   // TTS configuration
   ttsSettings: {
     autoPlay: true,
-    rate: 1.0,
-    pitch: 1.0,
-    volume: 0.8,
+    rate: 1.4, // Tăng tốc độ nói mặc định
+    pitch: 1.1, // Tăng pitch nhẹ để giữ chất lượng
+    volume: 0.9, // Tăng volume mặc định
     language: 'vi-VN',
   },
   

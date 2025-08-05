@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import { BotAvatar } from './BotAvatar';
-import { useAIAssistant } from '../hooks/useAIAssistant';
+import { useOptimizedAIAssistant } from '../hooks/useOptimizedAIAssistant';
 import { AIAssistantConfig } from '../types';
 import { cn } from '@/lib/utils';
 // No icons needed for pure animation interface
@@ -32,7 +32,8 @@ export const AIAssistantChat: React.FC<AIAssistantChatProps> = ({
     voiceState,
     stopSpeaking,
     ttsState,
-  } = useAIAssistant(initialConfig);
+    clearError,
+  } = useOptimizedAIAssistant(initialConfig);
 
   // ==================== MAIN INTERACTION HANDLER ====================
   
@@ -121,15 +122,22 @@ export const AIAssistantChat: React.FC<AIAssistantChatProps> = ({
               }
             )} />
 
-            {/* Enhanced Bot Avatar */}
-            <div className="transform transition-all duration-300 hover:scale-105">
+            {/* Enhanced Bot Avatar with optimized props */}
+            <div className="transform transition-all duration-300">
               <BotAvatar 
                 state={botState} 
                 size="xl"
                 showStatusText={false}
                 onClick={handleAvatarClick}
-                className="cursor-pointer"
+                isInteractive={true}
+                showPulse={true}
+                disabled={!voiceState.isSupported}
+                confidence={voiceState.confidence}
+                isProcessing={isLoading}
+                theme="default"
+                className="transition-all duration-500"
               />
+              
             </div>
           </div>
 
@@ -147,12 +155,36 @@ export const AIAssistantChat: React.FC<AIAssistantChatProps> = ({
         </div>
       </div>
 
-      {/* Minimal Error Display */}
+      {/* Enhanced Error Display */}
       {error && (
         <div className="absolute bottom-4 left-4 right-4 z-20">
-          <div className="bg-red-50 border border-red-200 rounded-xl p-3 shadow-lg">
-            <div className="text-sm text-red-700 text-center">
-              {error}
+          <div className="bg-red-50 border border-red-200 rounded-xl p-4 shadow-lg">
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <div className="flex items-center mb-1">
+                  <span className="text-red-600 mr-2">⚠️</span>
+                  <h4 className="text-sm font-semibold text-red-800">
+                    {error.type === 'api' ? 'Lỗi API' : 
+                     error.type === 'tts' ? 'Lỗi TTS' :
+                     error.type === 'voice' ? 'Lỗi Voice' : 'Lỗi hệ thống'}
+                  </h4>
+                </div>
+                <p className="text-sm text-red-700">{error.message}</p>
+                {error.recoverable && (
+                  <p className="text-xs text-red-600 mt-1">
+                    Bạn có thể thử lại
+                  </p>
+                )}
+              </div>
+              <button
+                onClick={clearError}
+                className="ml-3 text-red-400 hover:text-red-600 transition-colors"
+                aria-label="Đóng thông báo lỗi"
+              >
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                </svg>
+              </button>
             </div>
           </div>
         </div>

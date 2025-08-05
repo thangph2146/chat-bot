@@ -30,9 +30,9 @@ export default function AIAssistantPage() {
     enableAnimation: true,
     ttsSettings: {
       autoPlay: true,
-      rate: 1.0,
-      pitch: 1.0,
-      volume: 0.8,
+      rate: 1.4, // Tăng tốc độ nói từ 1.0 lên 1.4 (40% nhanh hơn)
+      pitch: 1.1, // Tăng pitch nhẹ để giữ chất lượng giọng nói
+      volume: 0.9, // Tăng volume nhẹ
       language: 'vi-VN' as const,
     },
     voiceSettings: {
