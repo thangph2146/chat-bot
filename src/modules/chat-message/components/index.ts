@@ -6,6 +6,7 @@ export { LoadingMessage } from './LoadingMessage';
 export { TextToSpeech } from './TextToSpeech';
 export { QuickTextToSpeech } from './QuickTextToSpeech';
 export { VietnameseTextToSpeech } from './VietnameseTextToSpeech';
+export { VoiceInputDebug } from './VoiceInputDebug';
 export { MessageActions } from './MessageActions';
 export { MessageStatus } from './MessageStatus';
 export { MarkdownRenderer } from './MarkdownRenderer'; 

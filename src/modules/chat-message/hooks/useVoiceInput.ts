@@ -30,6 +30,9 @@ declare global {
     webkitSpeechRecognition?: {
       new (): SpeechRecognition;
     };
+    SpeechRecognition?: {
+      new (): SpeechRecognition;
+    };
   }
 }
 
@@ -74,13 +77,22 @@ export const useVoiceInput = ({
       return;
     }
     
-    const SpeechRecognitionAPI = (typeof SpeechRecognition !== 'undefined' ? SpeechRecognition : window.webkitSpeechRecognition) as {
-      new (): SpeechRecognition;
-    };
+    // Try to get SpeechRecognition API
+    const SpeechRecognitionAPI = 
+      (window as any).SpeechRecognition || 
+      (window as any).webkitSpeechRecognition ||
+      (window as any).mozSpeechRecognition ||
+      (window as any).msSpeechRecognition;
+    
     setIsSupported(!!SpeechRecognitionAPI);
     
     if (SpeechRecognitionAPI) {
-      recognitionRef.current = new SpeechRecognitionAPI();
+      try {
+        recognitionRef.current = new SpeechRecognitionAPI();
+      } catch (error) {
+        console.error('Error creating SpeechRecognition instance:', error);
+        setIsSupported(false);
+      }
     }
   }, []);
 

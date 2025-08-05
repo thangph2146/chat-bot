@@ -10,6 +10,7 @@ import {
 } from 'react-icons/fa';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { useVoiceInput } from '../hooks/useVoiceInput';
+import { VoiceInputDebug } from './VoiceInputDebug';
 
 interface ChatInputProps {
   value: string;
@@ -28,6 +29,7 @@ interface ChatInputProps {
   showCharacterCount?: boolean;
   enableFileUpload?: boolean;
   enableVoiceInput?: boolean;
+  enableVoiceDebug?: boolean;
   onFileUpload?: (files: FileList) => void;
   onVoiceInput?: (transcript: string) => void;
 }
@@ -59,6 +61,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   showCharacterCount,
   enableFileUpload,
   enableVoiceInput,
+  enableVoiceDebug = false,
   onFileUpload,
   onVoiceInput,
 }) => {
@@ -77,6 +80,9 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     stopRecording,
     resetError
   } = useVoiceInput({
+    continuous: false,
+    interimResults: true,
+    lang: 'vi-VN',
     onTranscript: (transcript) => {
       if (transcript.trim()) {
         onChange(transcript);
@@ -181,9 +187,11 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     if (isRecording) {
       stopRecording();
     } else {
+      // Clear any previous error
+      resetError();
       startRecording();
     }
-  }, [isRecording, startRecording, stopRecording]);
+  }, [isRecording, startRecording, stopRecording, resetError]);
 
   // Show voice error if any
   useEffect(() => {
@@ -398,23 +406,37 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           </div>
 
           {voiceError && (
-            <div className="text-xs text-red-500 self-start mt-1 flex items-center justify-between w-full">
-              <div>
-                {voiceError}
+            <div className="text-xs text-red-500 self-start mt-1 flex items-center justify-between w-full bg-red-50 border border-red-200 rounded-lg p-2">
+              <div className="flex-1">
+                <div className="font-medium text-red-700 mb-1">Lỗi ghi âm:</div>
+                <div className="text-red-600">{voiceError}</div>
                 {voiceError && voiceError.includes('từ chối') && (
-                  <p className="text-xs text-red-600 mt-1">
-                    Hướng dẫn: Nhấp vào biểu tượng microphone trong thanh địa chỉ và cho phép truy cập microphone.
-                  </p>
+                  <div className="text-xs text-red-600 mt-2 p-2 bg-red-100 rounded">
+                    <strong>Hướng dẫn:</strong> Nhấp vào biểu tượng microphone trong thanh địa chỉ và cho phép truy cập microphone.
+                  </div>
+                )}
+                {voiceError && voiceError.includes('microphone') && (
+                  <div className="text-xs text-red-600 mt-2 p-2 bg-red-100 rounded">
+                    <strong>Hướng dẫn:</strong> Kiểm tra quyền truy cập microphone trong cài đặt trình duyệt.
+                  </div>
                 )}
               </div>
               <button
                 onClick={resetError}
-                className="ml-2 flex-shrink-0 text-red-400 hover:text-red-600"
+                className="ml-2 flex-shrink-0 text-red-400 hover:text-red-600 p-1"
+                title="Đóng thông báo lỗi"
               >
                 <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                   <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
                 </svg>
               </button>
+            </div>
+          )}
+
+          {/* Voice Debug Component */}
+          {enableVoiceDebug && (
+            <div className="mt-4">
+              <VoiceInputDebug />
             </div>
           )}
 
