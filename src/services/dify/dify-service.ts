@@ -34,7 +34,6 @@ class RateLimiter {
 
   private cleanup(): void {
     const now = Date.now();
-    const oneMinuteAgo = now - 60 * 1000;
     const oneHourAgo = now - 60 * 60 * 1000;
 
     this.requests = this.requests.filter(timestamp => timestamp > oneHourAgo);

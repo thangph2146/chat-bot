@@ -107,7 +107,7 @@ class RealtimeTTSService {
       if (this.manager.isPlaying) {
         try {
           speechSynthesis.cancel();
-        } catch (error) {
+        } catch {
           console.log('ℹ️ TTS cancel - normal behavior');
         }
       }
@@ -130,20 +130,20 @@ class RealtimeTTSService {
         console.log('🔇 TTS Ended');
       };
 
-      utterance.onerror = (error) => {
+      utterance.onerror = (event) => {
         this.manager.isPlaying = false;
         this.manager.currentUtterance = null;
         
         // Handle different error types gracefully
-        if (error.error === 'interrupted' || error.error === 'canceled') {
+        if (event.error === 'interrupted' || event.error === 'canceled') {
           // These are normal interruptions, not real errors
           console.log('ℹ️ TTS interrupted/canceled - normal behavior');
           callbacks?.onTTSEnd?.(); // Treat as normal end
           callbacks?.onBotStateChange?.('idle');
         } else {
           // Real error
-          const errorMessage = `TTS Error: ${error.error}`;
-          console.error('🚨 TTS Error:', error);
+          const errorMessage = `TTS Error: ${event.error}`;
+          console.error('🚨 TTS Error:', event);
           const ttsError = new Error(errorMessage);
           callbacks?.onTTSError?.(ttsError);
           callbacks?.onBotStateChange?.('idle');
@@ -230,7 +230,7 @@ class RealtimeTTSService {
     // Gracefully stop speech synthesis
     try {
       speechSynthesis.cancel();
-    } catch (error) {
+    } catch {
       console.log('ℹ️ TTS stop - normal behavior');
     }
     
@@ -243,7 +243,7 @@ class RealtimeTTSService {
   public pause = (): void => {
     try {
       speechSynthesis.pause();
-    } catch (error) {
+    } catch {
       console.log('ℹ️ TTS pause - normal behavior');
     }
   };
@@ -251,7 +251,7 @@ class RealtimeTTSService {
   public resume = (): void => {
     try {
       speechSynthesis.resume();
-    } catch (error) {
+    } catch {
       console.log('ℹ️ TTS resume - normal behavior');
     }
   };

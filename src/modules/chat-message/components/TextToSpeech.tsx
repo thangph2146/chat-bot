@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { FaPlay, FaPause, FaStop, FaVolumeUp } from "react-icons/fa";
 import { getDefaultVoice, getVietnameseVoices, getEnglishVoices } from "../utils/speechUtils";
 
@@ -10,8 +10,8 @@ interface TextToSpeechProps {
   className?: string;
 }
 
-export const TextToSpeech: React.FC<TextToSpeechProps> = ({ 
-  text, 
+export const TextToSpeech: React.FC<TextToSpeechProps> = ({
+  text,
   autoPlay = false,
   className = ""
 }) => {
@@ -23,12 +23,12 @@ export const TextToSpeech: React.FC<TextToSpeechProps> = ({
   const [rate, setRate] = useState(1);
   const [volume, setVolume] = useState(1);
   const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
-  
+
   const synth = useRef<SpeechSynthesis | null>(null);
 
   useEffect(() => {
     synth.current = window.speechSynthesis;
-    
+
     // Lấy danh sách voices có sẵn
     const loadVoices = () => {
       const voices = synth.current?.getVoices() || [];
@@ -54,35 +54,50 @@ export const TextToSpeech: React.FC<TextToSpeechProps> = ({
     };
   }, [voice]);
 
+  const handlePlay = useCallback(() => {
+    if (!synth.current || !utterance) return;
+
+    if (isPaused) {
+      synth.current.resume();
+    } else {
+      // Cập nhật utterance với các thuộc tính mới
+      utterance.voice = voice;
+      utterance.pitch = pitch;
+      utterance.rate = rate;
+      utterance.volume = volume;
+      synth.current.speak(utterance);
+    }
+  }, [utterance, voice, pitch, rate, volume, isPaused]);
+
   useEffect(() => {
     if (text && synth.current) {
       const u = new SpeechSynthesisUtterance(text);
-      
+
       // Thiết lập các thuộc tính
       u.voice = voice;
       u.pitch = pitch;
       u.rate = rate;
       u.volume = volume;
-      
+
       // Event listeners
       u.onstart = () => {
         setIsPlaying(true);
         setIsPaused(false);
       };
-      
+
       u.onend = () => {
         setIsPlaying(false);
         setIsPaused(false);
       };
-      
+
       u.onpause = () => {
         setIsPaused(true);
       };
-      
+
       u.onresume = () => {
         setIsPaused(false);
       };
-      
+
       u.onerror = (event) => {
         console.error('Text-to-speech error:', event);
         setIsPlaying(false);
@@ -96,22 +111,7 @@ export const TextToSpeech: React.FC<TextToSpeechProps> = ({
         handlePlay();
       }
     }
-  }, [text, voice, pitch, rate, volume, autoPlay]);
-
-  const handlePlay = () => {
-    if (!synth.current || !utterance) return;
-
-    if (isPaused) {
-      synth.current.resume();
-    } else {
-      // Cập nhật utterance với các thuộc tính mới
-      utterance.voice = voice;
-      utterance.pitch = pitch;
-      utterance.rate = rate;
-      utterance.volume = volume;
-      synth.current.speak(utterance);
-    }
-  };
+  }, [text, voice, pitch, rate, volume, autoPlay, handlePlay]);
 
   const handlePause = () => {
     if (synth.current) {
@@ -160,8 +160,8 @@ export const TextToSpeech: React.FC<TextToSpeechProps> = ({
         <label className="block text-sm font-medium text-gray-700 mb-2">
           Giọng đọc:
         </label>
-        <select 
-          value={voice?.name || ''} 
+        <select
+          value={voice?.name || ''}
           onChange={handleVoiceChange}
           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
@@ -175,7 +175,7 @@ export const TextToSpeech: React.FC<TextToSpeechProps> = ({
               ))}
             </optgroup>
           )}
-          
+
           {/* Tiếng Anh */}
           {getEnglishVoices().length > 0 && (
             <optgroup label="🇺🇸 Tiếng Anh">
@@ -186,10 +186,10 @@ export const TextToSpeech: React.FC<TextToSpeechProps> = ({
               ))}
             </optgroup>
           )}
-          
+
           {/* Các ngôn ngữ khác */}
-          {availableVoices.filter(v => 
-            !getVietnameseVoices().includes(v) && 
+          {availableVoices.filter(v =>
+            !getVietnameseVoices().includes(v) &&
             !getEnglishVoices().includes(v)
           ).map((v) => (
             <option key={v.name} value={v.name}>
@@ -215,7 +215,7 @@ export const TextToSpeech: React.FC<TextToSpeechProps> = ({
             className="w-full"
           />
         </div>
-        
+
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Cao độ: {pitch}
@@ -258,7 +258,7 @@ export const TextToSpeech: React.FC<TextToSpeechProps> = ({
           {isPaused ? <FaPlay className="w-4 h-4" /> : <FaPlay className="w-4 h-4" />}
           {isPaused ? 'Tiếp tục' : 'Phát'}
         </button>
-        
+
         {isPlaying && (
           <button
             onClick={handlePause}
@@ -268,7 +268,7 @@ export const TextToSpeech: React.FC<TextToSpeechProps> = ({
             Tạm dừng
           </button>
         )}
-        
+
         <button
           onClick={handleStop}
           className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"

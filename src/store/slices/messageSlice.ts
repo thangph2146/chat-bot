@@ -73,13 +73,6 @@ export const sendMessageWithLogging = createAsyncThunk(
     { messageText, userId }: { messageText: string; userId?: string },
     { dispatch, getState }
   ) => {
-    const startTime = Date.now();
-    const requestId = `req_${Date.now()}_${Math.random()
-      .toString(36)
-      .substr(2, 9)}`;
-
-
-
     try {
       let fullResponse = "";
       let conversationId = "";
@@ -122,23 +115,12 @@ export const sendMessageWithLogging = createAsyncThunk(
         );
       });
       
-      const endTime = Date.now();
-      const responseTime = endTime - startTime;
-
-
-
       return {
         response: { answer: fullResponse, fullMessage: fullResponse },
-        responseTime,
         conversationId: conversationId || (getState() as { message: MessageState }).message.currentConversationId,
         messageId: messageId || `msg_${Date.now()}`,
       };
     } catch (error: unknown) {
-      const endTime = Date.now();
-      const responseTime = endTime - startTime;
-
-
-
       throw error;
     }
   }

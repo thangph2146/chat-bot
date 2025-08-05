@@ -2,17 +2,17 @@
 
 import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { 
-  selectVisibleToasts, 
-  removeNotification, 
-  markAsRead 
+import {
+  selectVisibleToasts,
+  removeNotification,
+  markAsRead
 } from '@/store/slices/notificationSlice';
 import { cn } from '@/lib/utils';
 
 // Icons for different toast types
 const toastIcons = {
   success: '✅',
-  error: '❌', 
+  error: '❌',
   warning: '⚠️',
   info: 'ℹ️',
 };
@@ -25,7 +25,6 @@ const toastStyles = {
 };
 
 interface ToastItemProps {
-  id: string;
   type: 'success' | 'error' | 'warning' | 'info';
   title?: string;
   message: string;
@@ -34,7 +33,6 @@ interface ToastItemProps {
 }
 
 const ToastItem: React.FC<ToastItemProps> = ({
-  id,
   type,
   title,
   message,
@@ -77,15 +75,15 @@ const ToastItem: React.FC<ToastItemProps> = ({
       className={cn(
         'relative overflow-hidden rounded-lg border shadow-lg transition-all duration-300 mb-2 min-w-80 max-w-md',
         toastStyles[type],
-        isVisible 
-          ? 'transform translate-x-0 opacity-100' 
+        isVisible
+          ? 'transform translate-x-0 opacity-100'
           : 'transform translate-x-full opacity-0'
       )}
     >
       {/* Progress bar */}
       {duration > 0 && (
-        <div className="absolute top-0 left-0 h-1 bg-current opacity-30 transition-all duration-100 ease-linear" 
-             style={{ width: `${progress}%` }} />
+        <div className="absolute top-0 left-0 h-1 bg-current opacity-30 transition-all duration-100 ease-linear"
+          style={{ width: `${progress}%` }} />
       )}
 
       <div className="p-4">
@@ -142,7 +140,6 @@ const ToastContainer: React.FC = () => {
         {toasts.map((toast) => (
           <ToastItem
             key={toast.id}
-            id={toast.id}
             type={toast.type}
             title={toast.title}
             message={toast.message}

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { FaPlay, FaPause, FaStop, FaVolumeUp, FaFlag } from "react-icons/fa";
 import { getDefaultVoice, getVietnameseVoices, getEnglishVoices } from "../utils/speechUtils";
 
@@ -58,6 +58,21 @@ export const VietnameseTextToSpeech: React.FC<VietnameseTextToSpeechProps> = ({
     };
   }, [voice]);
 
+  const handlePlay = useCallback(() => {
+    if (!synth.current || !utterance) return;
+
+    if (isPaused) {
+      synth.current.resume();
+    } else {
+      // Cập nhật utterance với các thuộc tính mới
+      utterance.voice = voice;
+      utterance.pitch = pitch;
+      utterance.rate = rate;
+      utterance.volume = volume;
+      synth.current.speak(utterance);
+    }
+  }, [utterance, voice, pitch, rate, volume, isPaused]);
+
   useEffect(() => {
     if (text && synth.current) {
       const u = new SpeechSynthesisUtterance(text);
@@ -100,22 +115,7 @@ export const VietnameseTextToSpeech: React.FC<VietnameseTextToSpeechProps> = ({
         handlePlay();
       }
     }
-  }, [text, voice, pitch, rate, volume, autoPlay]);
-
-  const handlePlay = () => {
-    if (!synth.current || !utterance) return;
-
-    if (isPaused) {
-      synth.current.resume();
-    } else {
-      // Cập nhật utterance với các thuộc tính mới
-      utterance.voice = voice;
-      utterance.pitch = pitch;
-      utterance.rate = rate;
-      utterance.volume = volume;
-      synth.current.speak(utterance);
-    }
-  };
+  }, [text, voice, pitch, rate, volume, autoPlay, handlePlay]);
 
   const handlePause = () => {
     if (synth.current) {

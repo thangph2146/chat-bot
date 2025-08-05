@@ -44,7 +44,7 @@ class AIAssistantErrorBoundary extends React.Component<
             <div className="text-red-600 text-2xl mb-2">⚠️</div>
             <h3 className="text-red-800 font-semibold mb-2">Đã xảy ra lỗi</h3>
             <p className="text-red-600 text-sm mb-4">AI Assistant tạm thời không khả dụng</p>
-            <button 
+            <button
               onClick={() => this.setState({ hasError: false })}
               className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
             >
@@ -65,11 +65,11 @@ const usePerformanceMonitoring = (enabled: boolean) => {
     if (!enabled || typeof window === 'undefined') return;
 
     const startTime = performance.now();
-    
+
     return () => {
       const endTime = performance.now();
       const duration = endTime - startTime;
-      
+
       if (duration > 1000) {
         console.warn(`AIAssistant took ${duration.toFixed(2)}ms to load`);
       }
@@ -99,7 +99,7 @@ const DefaultErrorFallback: React.FC = () => (
       <div className="text-red-600 text-4xl mb-4">🤖</div>
       <h3 className="text-red-800 font-semibold mb-2">AI Assistant không khả dụng</h3>
       <p className="text-red-600 text-sm mb-4">Vui lòng thử lại sau</p>
-      <button 
+      <button
         onClick={() => window.location.reload()}
         className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
       >
@@ -112,8 +112,6 @@ const DefaultErrorFallback: React.FC = () => (
 const AIAssistantModule: React.FC<AIAssistantModuleProps> = ({
   config,
   className,
-  showHeader = false,
-  showSettings = false,
   enablePerformanceMonitoring = true,
   enableErrorBoundary = true,
   loadingFallback = <DefaultLoadingFallback />,
@@ -135,7 +133,7 @@ const AIAssistantModule: React.FC<AIAssistantModuleProps> = ({
 
   const moduleContent = (
     <Suspense fallback={loadingFallback}>
-      <AIAssistantChat 
+      <AIAssistantChat
         config={config}
         className={className}
       />

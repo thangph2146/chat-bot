@@ -28,7 +28,6 @@ interface UseTextToSpeechReturn {
 
 export const useTextToSpeech = (options: UseTextToSpeechOptions = {}): UseTextToSpeechReturn => {
   const {
-    autoPlay = false,
     voice: initialVoice = null,
     pitch: initialPitch = 1,
     rate: initialRate = 1,

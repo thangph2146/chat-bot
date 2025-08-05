@@ -45,14 +45,14 @@ export const BotAvatar: React.FC<BotAvatarProps> = ({
   const [isAnimating, setIsAnimating] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const [isPressed, setIsPressed] = useState(false);
-  const [soundEnabled, setSoundEnabled] = useState(enableSound);
+  const [soundEnabled] = useState(enableSound);
   const avatarRef = useRef<HTMLDivElement>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
 
   // Enhanced interaction handlers with haptic feedback
   const triggerHaptic = useCallback(() => {
     if (!enableHaptic || !navigator.vibrate) return;
-    
+
     const hapticPattern = {
       idle: [50],
       greeting: [100, 50, 100],
@@ -60,20 +60,20 @@ export const BotAvatar: React.FC<BotAvatarProps> = ({
       thinking: [50, 100, 50],
       speaking: [20, 20, 20, 20],
     };
-    
+
     navigator.vibrate(hapticPattern[state] || [50]);
   }, [enableHaptic, state]);
 
   const playInteractionSound = useCallback(() => {
     if (!soundEnabled || !audioContextRef.current) return;
-    
+
     try {
       const oscillator = audioContextRef.current.createOscillator();
       const gainNode = audioContextRef.current.createGain();
-      
+
       oscillator.connect(gainNode);
       gainNode.connect(audioContextRef.current.destination);
-      
+
       const frequency = {
         idle: 440,
         greeting: 523,
@@ -81,14 +81,14 @@ export const BotAvatar: React.FC<BotAvatarProps> = ({
         thinking: 392,
         speaking: 784,
       }[state] || 440;
-      
+
       oscillator.frequency.setValueAtTime(frequency, audioContextRef.current.currentTime);
       gainNode.gain.setValueAtTime(0.1, audioContextRef.current.currentTime);
       gainNode.gain.exponentialRampToValueAtTime(0.01, audioContextRef.current.currentTime + 0.1);
-      
+
       oscillator.start(audioContextRef.current.currentTime);
       oscillator.stop(audioContextRef.current.currentTime + 0.1);
-    } catch (error) {
+    } catch {
       console.log('Sound playback not supported');
     }
   }, [soundEnabled, state]);
@@ -130,7 +130,7 @@ export const BotAvatar: React.FC<BotAvatarProps> = ({
     if (soundEnabled && typeof window !== 'undefined') {
       audioContextRef.current = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
     }
-    
+
     return () => {
       if (audioContextRef.current) {
         audioContextRef.current.close();
@@ -144,12 +144,12 @@ export const BotAvatar: React.FC<BotAvatarProps> = ({
     if (newAnimation !== currentAnimation) {
       setIsAnimating(true);
       setCurrentAnimation(newAnimation);
-      
+
       // Dynamic animation duration based on state
-      const duration = newAnimation === 'thinking' ? 1200 : 
-                      newAnimation === 'wave' ? 1000 : 
-                      newAnimation === 'speaking' ? 800 : 600;
-      
+      const duration = newAnimation === 'thinking' ? 1200 :
+        newAnimation === 'wave' ? 1000 :
+          newAnimation === 'speaking' ? 800 : 600;
+
       const timeoutId = setTimeout(() => setIsAnimating(false), duration);
       return () => clearTimeout(timeoutId);
     }
@@ -200,7 +200,7 @@ export const BotAvatar: React.FC<BotAvatarProps> = ({
     const eyeClasses = cn('absolute bg-gray-800 rounded-full transition-all duration-300', {
       // Eye positions and sizes based on size
       'w-2 h-2': size === 'sm',
-      'w-3 h-3': size === 'md', 
+      'w-3 h-3': size === 'md',
       'w-4 h-4': size === 'lg',
       'w-5 h-5': size === 'xl',
       // Animation states with enhanced expressions
@@ -216,7 +216,7 @@ export const BotAvatar: React.FC<BotAvatarProps> = ({
       // Mouth sizes
       'w-4 h-2': size === 'sm',
       'w-6 h-2': size === 'md',
-      'w-8 h-3': size === 'lg', 
+      'w-8 h-3': size === 'lg',
       'w-10 h-4': size === 'xl',
       // Enhanced mouth animations
       'animate-pulse scale-110': currentAnimation === 'speaking',
@@ -236,27 +236,27 @@ export const BotAvatar: React.FC<BotAvatarProps> = ({
     return (
       <>
         {/* Left Eye */}
-        <div 
+        <div
           className={eyeClasses}
-          style={{ 
+          style={{
             left: `calc(50% - ${centerOffset.eye + (size === 'sm' ? 4 : size === 'md' ? 6 : size === 'lg' ? 8 : 10)}px)`,
             top: `calc(50% - ${centerOffset.eye}px)`
           }}
         />
-        
+
         {/* Right Eye */}
-        <div 
+        <div
           className={eyeClasses}
-          style={{ 
+          style={{
             right: `calc(50% - ${centerOffset.eye + (size === 'sm' ? 4 : size === 'md' ? 6 : size === 'lg' ? 8 : 10)}px)`,
             top: `calc(50% - ${centerOffset.eye}px)`
           }}
         />
-        
+
         {/* Mouth */}
-        <div 
+        <div
           className={mouthClasses}
-          style={{ 
+          style={{
             left: '50%',
             top: `calc(50% + ${centerOffset.mouth}px)`,
             transform: 'translateX(-50%)'
@@ -269,7 +269,7 @@ export const BotAvatar: React.FC<BotAvatarProps> = ({
   // Memoized theme-based colors with new neon theme
   const themeColors = useMemo(() => {
     if (customColor) return customColor;
-    
+
     const themes = {
       default: {
         idle: 'from-blue-200 to-blue-300 border-blue-400 shadow-blue-200/50',
@@ -300,7 +300,7 @@ export const BotAvatar: React.FC<BotAvatarProps> = ({
         speaking: 'from-violet-300 to-purple-400 border-violet-400 shadow-violet-300/80',
       },
     };
-    
+
     return themes[theme][state] || themes[theme].idle;
   }, [customColor, theme, state]);
 
@@ -314,29 +314,29 @@ export const BotAvatar: React.FC<BotAvatarProps> = ({
         'cursor-pointer': isInteractive && !disabled,
         'cursor-not-allowed': disabled,
         'cursor-default': !isInteractive,
-        
+
         // Interactive states
         'opacity-50': disabled,
         'transform transition-transform duration-200': isInteractive,
-        
+
         // Enhanced animations with better performance
         'animate-bounce': currentAnimation === 'wave' && isAnimating,
         'animate-pulse scale-105': currentAnimation === 'listening' && showPulse,
         'animate-spin': currentAnimation === 'thinking',
-        
+
         // Hover and press states with enhanced feedback
         'hover:scale-110 hover:shadow-2xl': isInteractive && !disabled && isHovered,
         'scale-95': isPressed,
         'scale-105': isHovered && !isPressed,
-        
+
         // Shadow variations with theme-specific enhancements
         'shadow-lg': !isAnimating,
         'shadow-2xl': isAnimating,
         'shadow-cyan-500/50': theme === 'neon' && isAnimating,
-        
+
         // Processing state
         'animate-pulse': isProcessing,
-        
+
         // Neon theme specific effects
         'ring-2 ring-cyan-400/50': theme === 'neon' && isHovered,
       },
@@ -350,7 +350,7 @@ export const BotAvatar: React.FC<BotAvatarProps> = ({
       <div className="relative">
         {/* Confidence Ring with enhanced visualization */}
         {confidence > 0 && state === 'listening' && (
-          <div 
+          <div
             className="absolute -inset-4 rounded-full border-2 border-red-300 transition-all duration-300"
             style={{
               background: `conic-gradient(from 0deg, #f87171 ${confidence * 360}deg, transparent ${confidence * 360}deg)`,
@@ -359,9 +359,9 @@ export const BotAvatar: React.FC<BotAvatarProps> = ({
             }}
           />
         )}
-        
+
         {/* Main Bot Avatar */}
-        <div 
+        <div
           ref={avatarRef}
           className={getAvatarClasses()}
           onClick={handleClick}
@@ -380,86 +380,86 @@ export const BotAvatar: React.FC<BotAvatarProps> = ({
             }
           } : undefined}
         >
-        {/* Face elements */}
-        {renderBotFace()}
-        
-        {/* Enhanced breathing animation ring */}
-        {showPulse && (
-          <div className={cn(
-            'absolute inset-0 rounded-full border-2 border-opacity-40 transition-all duration-1000',
-            {
-              'border-blue-400 animate-ping': state === 'listening',
-              'border-yellow-400 animate-pulse': state === 'thinking',
-              'border-purple-400 animate-pulse': state === 'speaking',
-              'border-green-400 animate-bounce': state === 'greeting',
-              'border-gray-300': state === 'idle',
-              // Enhanced pulse for interactive states
-              'border-blue-500 animate-ping': isHovered && state === 'idle',
-              // Neon theme specific
-              'border-cyan-400 animate-ping': theme === 'neon' && state === 'listening',
-            }
-          )} />
-        )}
-        
-        {/* Processing indicator with enhanced animation */}
-        {isProcessing && (
-          <div className="absolute inset-0 rounded-full border-2 border-cyan-400 animate-spin opacity-60" />
-        )}
-        
-        {/* Enhanced Wave animation for greeting */}
-        {currentAnimation === 'wave' && (
-          <div className="absolute -top-3 -right-3 text-3xl animate-bounce filter drop-shadow-lg">
-            👋
-          </div>
-        )}
-        
-        {/* Enhanced Sound waves for speaking with better timing */}
-        {state === 'speaking' && (
-          <div className="absolute -right-10 top-1/2 transform -translate-y-1/2">
-            <div className="flex space-x-1">
-              <div className="w-1.5 bg-purple-400 rounded-full animate-pulse shadow-sm" style={{ height: '16px', animationDelay: '0ms' }} />
-              <div className="w-1.5 bg-purple-500 rounded-full animate-pulse shadow-sm" style={{ height: '24px', animationDelay: '150ms' }} />
-              <div className="w-1.5 bg-purple-400 rounded-full animate-pulse shadow-sm" style={{ height: '20px', animationDelay: '300ms' }} />
-              <div className="w-1.5 bg-purple-500 rounded-full animate-pulse shadow-sm" style={{ height: '28px', animationDelay: '450ms' }} />
-              <div className="w-1.5 bg-purple-400 rounded-full animate-pulse shadow-sm" style={{ height: '18px', animationDelay: '600ms' }} />
+          {/* Face elements */}
+          {renderBotFace()}
+
+          {/* Enhanced breathing animation ring */}
+          {showPulse && (
+            <div className={cn(
+              'absolute inset-0 rounded-full border-2 border-opacity-40 transition-all duration-1000',
+              {
+                'border-blue-400 animate-ping': state === 'listening',
+                'border-yellow-400 animate-pulse': state === 'thinking',
+                'border-purple-400 animate-pulse': state === 'speaking',
+                'border-green-400 animate-bounce': state === 'greeting',
+                'border-gray-300': state === 'idle',
+                // Enhanced pulse for interactive states
+                'border-blue-500 animate-ping': isHovered && state === 'idle',
+                // Neon theme specific
+                'border-cyan-400 animate-ping': theme === 'neon' && state === 'listening',
+              }
+            )} />
+          )}
+
+          {/* Processing indicator with enhanced animation */}
+          {isProcessing && (
+            <div className="absolute inset-0 rounded-full border-2 border-cyan-400 animate-spin opacity-60" />
+          )}
+
+          {/* Enhanced Wave animation for greeting */}
+          {currentAnimation === 'wave' && (
+            <div className="absolute -top-3 -right-3 text-3xl animate-bounce filter drop-shadow-lg">
+              👋
             </div>
-          </div>
-        )}
-        
-        {/* Enhanced Listening indicator with better visual feedback */}
-        {state === 'listening' && (
-          <div className="absolute -left-10 top-1/2 transform -translate-y-1/2">
-            <div className="relative">
-              <div className="w-8 h-8 border-3 border-red-400 rounded-full animate-ping opacity-75" />
-              <div className="absolute inset-2 w-4 h-4 bg-red-400 rounded-full animate-pulse" />
+          )}
+
+          {/* Enhanced Sound waves for speaking with better timing */}
+          {state === 'speaking' && (
+            <div className="absolute -right-10 top-1/2 transform -translate-y-1/2">
+              <div className="flex space-x-1">
+                <div className="w-1.5 bg-purple-400 rounded-full animate-pulse shadow-sm" style={{ height: '16px', animationDelay: '0ms' }} />
+                <div className="w-1.5 bg-purple-500 rounded-full animate-pulse shadow-sm" style={{ height: '24px', animationDelay: '150ms' }} />
+                <div className="w-1.5 bg-purple-400 rounded-full animate-pulse shadow-sm" style={{ height: '20px', animationDelay: '300ms' }} />
+                <div className="w-1.5 bg-purple-500 rounded-full animate-pulse shadow-sm" style={{ height: '28px', animationDelay: '450ms' }} />
+                <div className="w-1.5 bg-purple-400 rounded-full animate-pulse shadow-sm" style={{ height: '18px', animationDelay: '600ms' }} />
+              </div>
             </div>
-          </div>
-        )}
-        
-        {/* Enhanced Thinking dots with better timing */}
-        {state === 'thinking' && (
-          <div className="absolute -bottom-10 left-1/2 transform -translate-x-1/2">
-            <div className="flex space-x-2">
-              <div className="w-3 h-3 bg-yellow-400 rounded-full animate-bounce shadow-sm" style={{ animationDelay: '0ms' }} />
-              <div className="w-3 h-3 bg-orange-400 rounded-full animate-bounce shadow-sm" style={{ animationDelay: '200ms' }} />
-              <div className="w-3 h-3 bg-yellow-400 rounded-full animate-bounce shadow-sm" style={{ animationDelay: '400ms' }} />
+          )}
+
+          {/* Enhanced Listening indicator with better visual feedback */}
+          {state === 'listening' && (
+            <div className="absolute -left-10 top-1/2 transform -translate-y-1/2">
+              <div className="relative">
+                <div className="w-8 h-8 border-3 border-red-400 rounded-full animate-ping opacity-75" />
+                <div className="absolute inset-2 w-4 h-4 bg-red-400 rounded-full animate-pulse" />
+              </div>
             </div>
-          </div>
-        )}
-        
-        {/* Hover effect ripple with theme-specific colors */}
-        {isHovered && isInteractive && !disabled && (
-          <div className={cn(
-            "absolute inset-0 rounded-full animate-ping",
-            {
-              'bg-white/20': theme !== 'neon',
-              'bg-cyan-400/30': theme === 'neon',
-            }
-          )} />
-        )}
+          )}
+
+          {/* Enhanced Thinking dots with better timing */}
+          {state === 'thinking' && (
+            <div className="absolute -bottom-10 left-1/2 transform -translate-x-1/2">
+              <div className="flex space-x-2">
+                <div className="w-3 h-3 bg-yellow-400 rounded-full animate-bounce shadow-sm" style={{ animationDelay: '0ms' }} />
+                <div className="w-3 h-3 bg-orange-400 rounded-full animate-bounce shadow-sm" style={{ animationDelay: '200ms' }} />
+                <div className="w-3 h-3 bg-yellow-400 rounded-full animate-bounce shadow-sm" style={{ animationDelay: '400ms' }} />
+              </div>
+            </div>
+          )}
+
+          {/* Hover effect ripple with theme-specific colors */}
+          {isHovered && isInteractive && !disabled && (
+            <div className={cn(
+              "absolute inset-0 rounded-full animate-ping",
+              {
+                'bg-white/20': theme !== 'neon',
+                'bg-cyan-400/30': theme === 'neon',
+              }
+            )} />
+          )}
         </div>
       </div>
-      
+
       {/* Enhanced Status Text with better styling */}
       {showStatusText && (
         <div className={cn(
@@ -479,7 +479,7 @@ export const BotAvatar: React.FC<BotAvatarProps> = ({
           )}
         </div>
       )}
-      
+
       {/* Enhanced Interactive hint with dynamic messaging */}
       {isInteractive && !disabled && (
         <>
@@ -494,7 +494,7 @@ export const BotAvatar: React.FC<BotAvatarProps> = ({
               ✨ Chạm để bắt đầu nói chuyện
             </div>
           )}
-          
+
           {state === 'idle' && isHovered && (
             <div className={cn(
               "text-sm text-center font-semibold px-4 py-2 rounded-full border-2 shadow-md transform scale-105",
@@ -506,7 +506,7 @@ export const BotAvatar: React.FC<BotAvatarProps> = ({
               🚀 Nhấp ngay!
             </div>
           )}
-          
+
           {state === 'speaking' && (
             <div className="text-sm text-purple-600 text-center font-medium bg-purple-50 px-4 py-2 rounded-full border border-purple-200">
               🤫 Chạm để dừng
@@ -514,7 +514,7 @@ export const BotAvatar: React.FC<BotAvatarProps> = ({
           )}
         </>
       )}
-      
+
       {/* Disabled state hint */}
       {disabled && (
         <div className="text-sm text-gray-500 text-center font-medium bg-gray-50 px-4 py-2 rounded-full border border-gray-200 opacity-75">
