@@ -3,6 +3,7 @@ import { Message, MessageAction, MessageBubbleConfig } from '../types';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { MessageActions } from './MessageActions';
 import { MessageStatus } from './MessageStatus';
+import { QuickTextToSpeech } from './QuickTextToSpeech';
 import { formatTimestamp } from '../utils/dateUtils';
 import { cn } from '@/lib/utils';
 import '../styles/animations.css';
@@ -284,6 +285,16 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                   />
                 )}
               </div>
+
+              {/* Text-to-Speech for Assistant Messages */}
+              {isAssistant && !isStreaming && (
+                <div className="mt-4">
+                  <QuickTextToSpeech 
+                    text={fullText}
+                    className="mt-3"
+                  />
+                </div>
+              )}
             </div>
           )}
         </div>
